@@ -23,7 +23,7 @@ The `file://` and static-server preview keep a local fallback, including `DEMO-A
 5. Deploy, take one diagnostic, submit an email, and verify rows appear in `leads`, `diagnostic_attempts`, and `analytics_events`.
 6. Click Founding Access and confirm the server redirects to the $29 link.
 
-The service-role key is server-only. Do not put it in `backend-config.js`, `checkout-config.js`, or any other public file.
+Use a new `SUPABASE_SECRET_KEY` (`sb_secret_…`) or the legacy `SUPABASE_SERVICE_ROLE_KEY`. Both are server-only. Do not put either in `backend-config.js`, `checkout-config.js`, or any other public file.
 
 For a local full-stack preview, install the Vercel CLI and run `vercel dev`. A plain static server intentionally has no backend.
 
