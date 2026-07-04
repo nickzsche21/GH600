@@ -297,6 +297,8 @@ dialog::backdrop { background: rgba(12, 16, 13, .75); backdrop-filter: blur(8px)
 .access-modal h2 { font-size: 37px; line-height: 1.05; letter-spacing: -.06em; margin: 17px 0 10px; }
 .access-modal > p { color: var(--muted); line-height: 1.6; font-size: 13px; }
 .access-modal form { display: grid; gap: 13px; margin: 25px 0 15px; }
+.conditional-fields { display: grid; gap: 13px; padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.52); }
+.conditional-fields[hidden] { display: none; }
 .access-modal label { display: grid; gap: 6px; font-size: 10px; font-weight: 700; }
 .access-modal input, .access-modal select { width: 100%; height: 47px; border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; background: white; color: var(--ink); }
 .access-modal textarea { min-height: 110px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: white; color: var(--ink); font: inherit; }
