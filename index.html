@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Pass GH-600 with hands-on agentic AI scenarios across MCP, GitHub Actions, memory, guardrails, and multi-agent workflows—not dumps.">
+  <title>GH600 Lab — Hands-on Agentic AI Certification Practice</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="GH600 Lab home">
+      <span class="brand-mark">G6</span>
+      <span>GH600 <b>Lab</b></span>
+    </a>
+    <nav aria-label="Primary navigation">
+      <a href="#method">Method</a>
+      <a href="#domains">Domains</a>
+      <a href="#pricing">Pricing</a>
+    </nav>
+    <button class="button button-small button-ghost" data-open-pro>Pro access <span>↗</span></button>
+  </header>
+  <div class="compliance-banner">
+    <strong>Original GH-600 practice lab.</strong> Public-doc based scenarios. No dumps. No memorization traps.
+  </div>
+
+  <main id="top">
+    <section class="hero page-shell">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="pulse"></span> Founding access open · Microsoft Learn course available July 20</div>
+        <h1>Pass GH-600 with hands-on agentic AI scenarios—<em>not dumps.</em></h1>
+        <p class="hero-lede">Practice MCP configs, GitHub Actions workflows, custom agents, logs, artifacts, memory/state issues, guardrails, and multi-agent failures mapped to the official GH-600 skills outline.</p>
+        <div class="hero-actions">
+          <button class="button button-primary" data-start-quiz>Take free 12-question diagnostic <span>→</span></button>
+          <button class="button button-dark" data-open-access data-plan="founder">Get founding access — $29</button>
+        </div>
+        <div class="proof-row" aria-label="Product highlights">
+          <div><strong>18</strong><span>original scenarios live</span></div>
+          <div><strong>6/6</strong><span>exam domains</span></div>
+          <div><strong>0</strong><span>real exam questions</span></div>
+        </div>
+      </div>
+
+      <div class="hero-visual" aria-label="Practice question preview">
+        <div class="terminal-bar">
+          <div class="terminal-dots"><i></i><i></i><i></i></div>
+          <span>scenario_07.json</span>
+          <span class="terminal-status">LIVE</span>
+        </div>
+        <div class="scenario-preview">
+          <div class="scenario-meta"><span>D2 · TOOL USE</span><span>01:42</span></div>
+          <pre class="preview-artifact"><code>retry:
+  max_attempts: 5
+  verify_state: false
+  idempotency_key: null</code></pre>
+          <h2>A timed-out deployment may already have succeeded. Which configuration change prevents a duplicate release?</h2>
+          <div class="preview-options">
+            <div><span>A</span> Increase the retry count</div>
+            <div class="selected"><span>B</span> Add an idempotency key and verify state</div>
+            <div><span>C</span> Give the agent admin access</div>
+          </div>
+          <div class="preview-result"><b>Correct.</b> Retry safety starts with idempotent actions and state verification—not more attempts.</div>
+          <div class="preview-footer"><span>Objective 2.4 · Robust error handling</span><span>Next →</span></div>
+        </div>
+        <div class="floating-score">
+          <span>READINESS</span>
+          <strong>62<small>%</small></strong>
+          <div><i style="width:62%"></i></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="scenario-showcase page-shell" id="scenario-preview">
+      <div class="section-kicker">What a scenario looks like</div>
+      <div class="section-heading compact">
+        <h2>Inspect the evidence. Make the call.</h2>
+        <p>Not a flashcard. Each lab combines real-looking artifacts with a production decision and a blueprint-mapped explanation.</p>
+      </div>
+      <div class="lab-showcase">
+        <div class="artifact-stack">
+          <div class="artifact-tabs"><span class="active">mcp.json</span><span>deploy.yml</span><span>agent.log</span></div>
+          <div class="artifact-window">
+            <div class="artifact-head"><span>mcp.json</span><small>CONFIG · LINE 1–8</small></div>
+            <pre><code>{
+  "server": "github",
+  "repositories": ["*"],
+  "permissions": [
+    "repo:admin",
+    "org:admin"
+  ]
+}</code></pre>
+          </div>
+          <div class="artifact-window small-artifact">
+            <div class="artifact-head"><span>deploy.yml</span><small>GITHUB ACTIONS</small></div>
+            <pre><code>permissions: write-all
+environment: production
+approval_required: false</code></pre>
+          </div>
+          <div class="artifact-log"><span>14:03:11</span> agent requested <b>org.delete</b><br><span>14:03:12</span> policy decision: <i>ALLOW</i></div>
+        </div>
+        <div class="lab-decision">
+          <div class="lab-meta"><span>DOMAIN 02 · TOOL USE</span><span>HARD</span></div>
+          <h3>The documentation agent only needs to read files and open pull requests. What is the safest next action?</h3>
+          <div class="lab-options">
+            <div><span>A</span> Keep admin access and add more logging</div>
+            <div class="correct"><span>B</span> Scope the token to one repository and the two required actions</div>
+            <div><span>C</span> Move the admin token into the system prompt</div>
+          </div>
+          <div class="lab-explanation"><b>Why B is correct</b><p>Least privilege reduces both authorization and blast radius. Logging records misuse; it does not prevent it.</p></div>
+          <div class="lab-why"><span>WHY THIS MATTERS ON GH-600</span><p>Maps to “Configure agent tool permissions” in the highest-weighted exam domain.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="signal-strip" aria-label="Exam details">
+      <div><span class="mono">EXAM</span><strong>GH-600</strong></div>
+      <div><span class="mono">LEVEL</span><strong>Intermediate</strong></div>
+      <div><span class="mono">DURATION</span><strong>120 minutes</strong></div>
+      <div><span class="mono">PASS</span><strong>700 / 1000</strong></div>
+      <div><span class="mono">FORMAT</span><strong>Proctored + interactive</strong></div>
+    </section>
+
+    <section class="method page-shell" id="method">
+      <div class="section-kicker">Why this works</div>
+      <div class="section-heading">
+        <h2>Most prep teaches vocabulary.<br>GH-600 tests <em>judgment.</em></h2>
+        <p>Every drill puts you inside a production incident. Choose the control, inspect the consequence, and learn the exam logic behind the answer.</p>
+      </div>
+      <div class="method-grid">
+        <article>
+          <span class="step-no">01</span>
+          <div class="mini-ui mini-ui-incident">
+            <span>INCIDENT</span>
+            <b>Two agents edited the same workflow.</b>
+            <i>Conflict detected</i>
+          </div>
+          <h3>Read the constraint</h3>
+          <p>Realistic scenarios force you to separate the business requirement from plausible distractions.</p>
+        </article>
+        <article>
+          <span class="step-no">02</span>
+          <div class="mini-ui mini-ui-choice">
+            <span>YOUR MOVE</span>
+            <b>Isolate branches</b>
+            <b class="muted">Share one workspace</b>
+          </div>
+          <h3>Make the call</h3>
+          <p>Options are intentionally close. You practice choosing the safest design that preserves delivery speed.</p>
+        </article>
+        <article>
+          <span class="step-no">03</span>
+          <div class="mini-ui mini-ui-autopsy">
+            <span>DECISION AUTOPSY</span>
+            <div><i></i><i></i><i></i><i></i></div>
+            <b>Least privilege → isolation → audit</b>
+          </div>
+          <h3>Understand why</h3>
+          <p>Every answer maps back to a published exam objective, with the trap and trade-off explained.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="dashboard-section page-shell" id="domains">
+      <div class="dashboard-copy">
+        <div class="section-kicker">Your readiness report</div>
+        <h2>A score is nice. A next move is valuable.</h2>
+        <p>The diagnostic shows what is strong, what is weak, and exactly what to study over the next three days.</p>
+        <ul>
+          <li><span>✓</span> Strong: Architecture, Guardrails</li>
+          <li><span>!</span> Weak: MCP config, memory/state, multi-agent recovery</li>
+          <li><span>→</span> Personalized three-day cram path + official docs</li>
+        </ul>
+        <button class="button button-dark" data-start-quiz>Measure my readiness <span>→</span></button>
+      </div>
+      <div class="dashboard-card">
+        <div class="dash-head"><div><span class="avatar">JK</span><p><b>Readiness report</b><small>Free diagnostic sample</small></p></div><span class="pill warning">NEEDS FOCUS</span></div>
+        <div class="readiness-overview">
+          <div class="score-ring" style="--score:62"><strong>62%</strong><span>Readiness</span></div>
+          <div><span>Strongest areas</span><strong>Architecture · Guardrails</strong><small>Three weak clusters detected</small></div>
+        </div>
+        <div class="domain-bars" id="landing-domain-bars"></div>
+        <div class="cram-preview"><b>3-DAY CRAM PATH</b><div><span>DAY 1</span><p>MCP permissions + execution scope</p></div><div><span>DAY 2</span><p>Memory expiry + durable state</p></div><div><span>DAY 3</span><p>Multi-agent recovery + mock</p></div></div>
+        <div class="dash-note"><span>↗</span><p><b>Recommended official docs</b><br>Tooling, MCP, and Agent Execution Environments</p></div>
+      </div>
+    </section>
+
+    <section class="blueprint page-shell">
+      <div class="section-kicker">Blueprint coverage</div>
+      <div class="section-heading compact">
+        <h2>Mapped to all six official GH-600 domains.</h2>
+        <p>Coverage mirrors the published GH-600 skills outline, including the highest-weighted Tool Use domain.</p>
+      </div>
+      <div class="blueprint-grid" id="blueprint-grid"></div>
+    </section>
+
+    <section class="pricing page-shell" id="pricing">
+      <div class="section-kicker light">Simple pricing</div>
+      <div class="section-heading compact light">
+        <h2>One failed attempt costs more.</h2>
+        <p>One-time launch pricing. Validate the exam before the official training ecosystem catches up.</p>
+      </div>
+      <div class="pricing-grid">
+        <article class="price-card">
+          <span class="plan">FREE</span>
+          <h3>$0</h3>
+          <p>Find the gaps before you study.</p>
+          <ul><li>12 diagnostic scenarios</li><li>6-domain readiness map</li><li>Answer explanations</li><li>Local progress saving</li></ul>
+          <button class="button button-outline-light" data-start-quiz>Start diagnostic</button>
+        </article>
+        <article class="price-card featured">
+          <div class="popular">FIRST 100 ONLY</div>
+          <span class="plan">FOUNDING ACCESS</span>
+          <h3>$29<small> lifetime</small></h3>
+          <p>Get today’s 18 live scenarios plus every founding-window scenario drop.</p>
+          <ul><li>18 live original scenarios today</li><li>Future artifact scenario drops</li><li>Detailed readiness report</li><li>Full 18-question Pro lab</li><li>Price rises to $49 after founding</li></ul>
+          <button class="button button-acid" data-open-access data-plan="founder">Buy founding access <span>→</span></button>
+        </article>
+        <article class="price-card">
+          <span class="plan">TEAM PACK</span>
+          <h3>$149<small> once</small></h3>
+          <p>For partners, consultants and training cohorts.</p>
+          <ul><li>10 learner seats</li><li>Manager readiness snapshot</li><li>Domain-level team gaps</li><li>CSV progress export</li><li>Invoice included</li></ul>
+          <button class="button button-outline-light" data-open-access data-plan="team">Reserve team pack</button>
+        </article>
+      </div>
+      <div class="cram-offer"><div><span>NEED IT FAST?</span><b>Urgent GH-600 cram call · 60 minutes · $99</b><p>Limited manual sessions for early candidates.</p></div><button class="button button-outline-light" data-open-access data-plan="cram">Request a slot</button></div>
+      <p class="refund-note">Founder refund policy: request a refund within 7 days if you have completed fewer than 25% of paid scenarios.</p>
+      <p class="disclaimer">GH600 Lab is an independent, unofficial practice product and is not affiliated with GitHub, Microsoft, Pearson VUE, or the official GH-600 exam. All scenarios are original and based on public objectives and documentation. No recalled or unauthorized exam content is included.</p>
+    </section>
+
+    <section class="final-cta page-shell">
+      <div><span class="mono">FREE · 8 MINUTES · NO CARD</span><h2>Your weakest domain is already costing you points.</h2></div>
+      <button class="button button-primary" data-start-quiz>Find it now <span>→</span></button>
+    </section>
+  </main>
+
+  <footer class="site-footer page-shell">
+    <a class="brand" href="#top"><span class="brand-mark">G6</span><span>GH600 <b>Lab</b></span></a>
+    <p>GH600 Lab is an independent, unofficial practice product and is not affiliated with GitHub, Microsoft, Pearson VUE, or the official GH-600 exam. All scenarios are original and based on public objectives and documentation. No recalled or unauthorized exam content is included.</p>
+    <div><a href="https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/gh-600" target="_blank" rel="noreferrer">Official blueprint ↗</a><a href="#pricing">Pricing</a><button class="footer-button" data-open-pro>Pro access</button><button class="footer-button" data-open-issue>Report an issue</button></div>
+  </footer>
+
+  <dialog class="quiz-shell" id="quiz-dialog">
+    <div class="quiz-app">
+      <header class="quiz-header">
+        <a class="brand"><span class="brand-mark">G6</span><span>GH600 <b>Lab</b></span></a>
+        <div class="quiz-progress-wrap"><span id="quiz-progress-label">Scenario 1 of 12</span><div class="quiz-progress"><i id="quiz-progress-bar"></i></div></div>
+        <button class="icon-button" id="close-quiz" aria-label="Close diagnostic">×</button>
+      </header>
+      <div class="quiz-body" id="quiz-body"></div>
+    </div>
+  </dialog>
+
+  <dialog class="access-modal" id="access-dialog">
+    <button class="icon-button modal-close" data-close-access aria-label="Close">×</button>
+    <span class="modal-kicker">FOUNDING ACCESS</span>
+    <h2>Be first into the full lab.</h2>
+    <p>Enter your email, then continue to the configured checkout. If payment is not connected yet, your founding request is saved.</p>
+    <form id="access-form">
+      <label>Email address<input type="email" id="access-email" placeholder="you@company.com" required></label>
+      <label>Plan<select id="access-plan"><option value="founder">Founding Access — $29 lifetime</option><option value="team">Team Pack — $149 once</option><option value="cram">Urgent Cram Call — $99</option></select></label>
+      <button class="button button-primary" type="submit">Continue to founding access <span>→</span></button>
+    </form>
+    <small>GH600 Lab is an independent, unofficial practice product and is not affiliated with GitHub, Microsoft, Pearson VUE, or the official GH-600 exam. All scenarios are original and based on public objectives and documentation. No recalled or unauthorized exam content is included.</small>
+  </dialog>
+
+  <dialog class="access-modal" id="pro-gate-dialog">
+    <button class="icon-button modal-close" data-close-pro aria-label="Close">×</button>
+    <span class="modal-kicker">PAID MEMBER ACCESS</span>
+    <h2>Enter the Pro lab.</h2>
+    <p>Use the email from checkout and the access code sent after payment.</p>
+    <form id="pro-gate-form">
+      <label>Email address<input type="email" id="pro-email" placeholder="you@company.com" required></label>
+      <label>Access code<input type="text" id="pro-code" placeholder="GH600-XXXX" required autocomplete="off"></label>
+      <button class="button button-primary" type="submit">Unlock Pro lab <span>→</span></button>
+    </form>
+    <small id="pro-gate-message">Manual access codes are fine for the first 20 customers.</small>
+  </dialog>
+
+  <dialog class="pro-modal" id="pro-area-dialog">
+    <button class="icon-button modal-close" data-close-pro-area aria-label="Close">×</button>
+    <span class="modal-kicker">PRO LAB · FOUNDING BUILD</span>
+    <h2>All 18 live scenarios are unlocked.</h2>
+    <p>Your Pro run includes three questions from every official domain and all six artifact labs.</p>
+    <div class="pro-stats"><div><strong>18</strong><span>live scenarios</span></div><div><strong>6</strong><span>artifact labs</span></div><div><strong>18m</strong><span>target time</span></div></div>
+    <button class="button button-primary" id="start-pro-lab">Start full Pro lab <span>→</span></button>
+  </dialog>
+
+  <dialog class="access-modal" id="issue-dialog">
+    <button class="icon-button modal-close" data-close-issue aria-label="Close">×</button>
+    <span class="modal-kicker">REPORT AN ISSUE</span>
+    <h2>Help improve the lab.</h2>
+    <form id="issue-form"><label>Email<input type="email" id="issue-email" placeholder="you@company.com" required></label><label>What looks wrong?<textarea id="issue-text" placeholder="Question, answer, explanation, or UI issue…" required></textarea></label><button class="button button-primary" type="submit">Save report</button></form>
+    <small>Stored locally until a backend endpoint is connected.</small>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="checkout-config.js"></script>
+  <script src="access-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
