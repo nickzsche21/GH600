@@ -263,6 +263,16 @@ approval_required: false</code></pre>
     <form id="access-form">
       <label>Email address<input type="email" id="access-email" placeholder="you@company.com" required></label>
       <label>Plan<select id="access-plan"><option value="founder">Founding Access — $29 lifetime</option><option value="team">Team Pack — $149 once</option><option value="cram">Urgent Cram Call — $99</option></select></label>
+      <div class="conditional-fields" id="team-fields" hidden>
+        <label>Company or cohort<input type="text" id="team-company" placeholder="Acme Consulting"></label>
+        <label>Expected learners<input type="number" id="team-size" min="2" max="100" placeholder="10"></label>
+        <label>What do you need?<textarea id="team-message" placeholder="Timeline, invoice details, or training goals…"></textarea></label>
+      </div>
+      <div class="conditional-fields" id="cram-fields" hidden>
+        <label>Preferred time<input type="text" id="cram-time" placeholder="Tomorrow, 7 PM IST"></label>
+        <label>Exam date<input type="date" id="cram-exam-date"></label>
+        <label>Weakest area<input type="text" id="cram-weak-area" placeholder="MCP, memory, multi-agent…"></label>
+      </div>
       <button class="button button-primary" type="submit">Continue to founding access <span>→</span></button>
     </form>
     <small>GH600 Lab is an independent, unofficial practice product and is not affiliated with GitHub, Microsoft, Pearson VUE, or the official GH-600 exam. All scenarios are original and based on public objectives and documentation. No recalled or unauthorized exam content is included.</small>
@@ -295,10 +305,11 @@ approval_required: false</code></pre>
     <span class="modal-kicker">REPORT AN ISSUE</span>
     <h2>Help improve the lab.</h2>
     <form id="issue-form"><label>Email<input type="email" id="issue-email" placeholder="you@company.com" required></label><label>What looks wrong?<textarea id="issue-text" placeholder="Question, answer, explanation, or UI issue…" required></textarea></label><button class="button button-primary" type="submit">Save report</button></form>
-    <small>Stored locally until a backend endpoint is connected.</small>
+    <small>Reports are saved privately so the lab can be corrected quickly.</small>
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="backend-config.js"></script>
   <script src="checkout-config.js"></script>
   <script src="access-config.js"></script>
   <script src="app.js"></script>

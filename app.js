@@ -56,6 +56,32 @@ audit_log: true`}, q:"A maintenance agent can format code, rotate production sec
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
+const backend = window.GH600_BACKEND || { enabled: false, apiBase: "/api" };
+const sessionId = localStorage.getItem("gh600lab-session-id") || (crypto.randomUUID?.() || `session-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+localStorage.setItem("gh600lab-session-id", sessionId);
+const query = new URLSearchParams(window.location.search);
+const attribution = {
+  utm_source: query.get("utm_source") || "",
+  utm_medium: query.get("utm_medium") || "",
+  utm_campaign: query.get("utm_campaign") || ""
+};
+
+async function apiRequest(path, payload) {
+  if (!backend.enabled) return null;
+  try {
+    const response = await fetch(`${backend.apiBase}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({ ok: false, error: "Unexpected server response" }));
+    return response.ok ? data : { ...data, ok: false };
+  } catch (error) {
+    console.warn(`GH600 API ${path} unavailable`, error);
+    return null;
+  }
+}
+
 function trackEvent(name, properties = {}) {
   const event = { name, properties, at: new Date().toISOString() };
   window.dataLayer = window.dataLayer || [];
@@ -64,12 +90,49 @@ function trackEvent(name, properties = {}) {
   events.push(event);
   localStorage.setItem("gh600lab-analytics", JSON.stringify(events.slice(-100)));
   window.dispatchEvent(new CustomEvent("gh600lab:analytics", { detail: event }));
+  void apiRequest("/event", {
+    session_id: sessionId,
+    email: localStorage.getItem("gh600lab-known-email") || null,
+    event_name: name,
+    metadata: properties
+  });
 }
 
 function saveLocalRecord(key, record) {
   const records = JSON.parse(localStorage.getItem(key) || "[]");
   records.push({ ...record, at: new Date().toISOString() });
   localStorage.setItem(key, JSON.stringify(records));
+}
+
+function captureLead(record) {
+  saveLocalRecord("gh600lab-leads", record);
+  localStorage.setItem("gh600lab-known-email", record.email.toLowerCase());
+  return apiRequest("/lead", {
+    ...record,
+    path: `${window.location.pathname}${window.location.search}`,
+    ...attribution
+  });
+}
+
+function rankDomains(domainScores) {
+  const ranked = domains.map((domain, index) => ({ name: domain.name, score: domainScores[index] })).sort((a, b) => b.score - a.score);
+  return {
+    strongest_domains: ranked.filter(item => item.score === ranked[0].score).map(item => item.name),
+    weakest_domains: ranked.filter(item => item.score === ranked[ranked.length - 1].score).map(item => item.name)
+  };
+}
+
+function diagnosticPayload(result, email = null) {
+  return {
+    session_id: sessionId,
+    email,
+    score: result.correct,
+    total_questions: result.total,
+    readiness_percent: result.score,
+    ...rankDomains(result.domainScores),
+    answers: result.answers,
+    completed: true
+  };
 }
 
 const landingScores = [82, 41, 44, 74, 38, 79];
@@ -177,7 +240,14 @@ function checkAnswer() {
   locked = true;
   const item = quizSet[quizIndex];
   const correct = selected === item.c;
-  answers.push({ domain: item.d, correct });
+  answers.push({
+    scenario_id: `gh600-${questions.indexOf(item) + 1}`,
+    domain: item.d,
+    objective: item.objective,
+    selected_answer: selected,
+    correct_answer: item.c,
+    correct
+  });
   $$("[data-answer]", quizBody).forEach((button, i) => {
     button.disabled = true;
     if (i === item.c) button.classList.add("correct");
@@ -201,10 +271,16 @@ function finishQuiz() {
     const results = answers.filter(a => a.domain === d.id);
     return results.length ? Math.round(results.filter(a => a.correct).length / results.length * 100) : 0;
   });
-  const result = { score, correct, domainScores, total: quizSet.length, date: new Date().toISOString(), mode: quizMode };
+  const result = { score, correct, domainScores, answers: [...answers], total: quizSet.length, date: new Date().toISOString(), mode: quizMode };
   pendingResult = result;
   localStorage.setItem("gh600lab-last-result", JSON.stringify(result));
-  if (quizMode === "diagnostic") trackEvent("diagnostic_completed", { score, correct, question_count: quizSet.length });
+  if (quizMode === "diagnostic") {
+    trackEvent("diagnostic_completed", { score, correct, question_count: quizSet.length });
+    result.attemptRequest = apiRequest("/diagnostic/complete", diagnosticPayload(result)).then(response => {
+      if (response?.ok) result.attemptId = response.attempt_id;
+      return response;
+    });
+  }
   $("#quiz-progress-label").textContent = quizMode === "pro" ? "Pro lab complete" : "Diagnostic complete";
   $("#quiz-progress-bar").style.width = "100%";
   if (quizMode === "pro") renderDetailedReport(result);
@@ -217,10 +293,15 @@ function renderReportGate(result) {
       <div class="result-score"><div class="score-ring" style="--score:${result.score}"><strong>${result.score}%</strong><span>Readiness</span></div><h2>${result.score >= 75 ? "You’re close." : "Good—now we know."}</h2><p>${result.correct} of ${result.total} decisions correct</p></div>
       <div class="report-gate"><span>YOUR DETAILED REPORT IS READY</span><h2>Unlock weak domains and your three-day study path.</h2><p>Enter your email to see all six domain scores, your weakest objective, and the recommended next move.</p><div class="report-teaser"><span>6 domain scores</span><span>weakest cluster</span><span>3-day plan</span></div><form id="report-email-form"><input type="email" id="report-email" placeholder="you@company.com" required><button class="button button-primary" type="submit">Show my report →</button></form></div>
     </section>`;
-  $("#report-email-form").addEventListener("submit", event => {
+  $("#report-email-form").addEventListener("submit", async event => {
     event.preventDefault();
     const email = $("#report-email").value.trim();
+    const submit = event.submitter;
+    if (submit) { submit.disabled = true; submit.textContent = "Saving…"; }
     saveLocalRecord("gh600lab-report-leads", { email, score: result.score, source: "diagnostic_report" });
+    await captureLead({ email, current_score: result.score, source: "diagnostic_report", plan_interest: "founder" });
+    if (result.attemptRequest) await result.attemptRequest;
+    await apiRequest("/diagnostic/complete", { ...diagnosticPayload(result, email), attempt_id: result.attemptId });
     localStorage.setItem("gh600lab-report-email", email);
     trackEvent("email_captured", { source: "diagnostic_report", score: result.score });
     renderDetailedReport(result);
@@ -259,7 +340,15 @@ quizDialog.addEventListener("cancel", e => { e.preventDefault(); closeQuiz(); })
 const accessDialog = $("#access-dialog");
 function openAccess(plan = "founder") {
   $("#access-plan").value = plan;
+  updatePlanFields();
   accessDialog.showModal();
+}
+function updatePlanFields() {
+  const plan = $("#access-plan").value;
+  $("#team-fields").hidden = plan !== "team";
+  $("#cram-fields").hidden = plan !== "cram";
+  const action = $("#access-form button[type='submit']");
+  action.firstChild.textContent = plan === "team" ? "Reserve team pack " : plan === "cram" ? "Request cram slot " : "Continue to founding access ";
 }
 function closeAccess() { accessDialog.close(); }
 $$('[data-open-access]').forEach(button => button.addEventListener("click", () => {
@@ -269,20 +358,36 @@ $$('[data-open-access]').forEach(button => button.addEventListener("click", () =
   openAccess(plan);
 }));
 $$('[data-close-access]').forEach(button => button.addEventListener("click", closeAccess));
-$("#access-form").addEventListener("submit", event => {
+$("#access-plan").addEventListener("change", updatePlanFields);
+$("#access-form").addEventListener("submit", async event => {
   event.preventDefault();
   const email = $("#access-email").value.trim();
   const plan = $("#access-plan").value;
-  saveLocalRecord("gh600lab-leads", { email, plan, source: "checkout_intent" });
+  const submit = event.submitter;
+  if (submit) { submit.disabled = true; submit.firstChild.textContent = "Preparing checkout… "; }
+  const metadata = plan === "team" ? {
+    company: $("#team-company").value.trim(),
+    team_size: Number($("#team-size").value) || null,
+    message: $("#team-message").value.trim()
+  } : plan === "cram" ? {
+    preferred_time: $("#cram-time").value.trim(),
+    exam_date: $("#cram-exam-date").value,
+    weak_area: $("#cram-weak-area").value.trim()
+  } : {};
+  await captureLead({ email, plan_interest: plan, source: "checkout_intent", metadata });
   trackEvent("email_captured", { source: "checkout_intent", plan });
-  const checkoutUrl = window.GH600_CHECKOUT?.[plan];
+  const intent = await apiRequest("/checkout-intent", { email, plan, source_page: `${window.location.pathname}${window.location.search}`, metadata });
+  const checkoutUrl = intent?.redirect_url || window.GH600_CHECKOUT?.[plan];
   if (checkoutUrl) {
+    trackEvent("checkout_redirected", { plan, provider: intent?.redirect_url ? "razorpay" : "local_config" });
     window.location.assign(checkoutUrl);
     return;
   }
   closeAccess();
   event.target.reset();
-  showToast("Founding access reserved — you’re on the list.");
+  updatePlanFields();
+  showToast(plan === "team" || plan === "cram" ? "Request saved — I’ll follow up personally." : "Founding access reserved — checkout is being connected.");
+  if (submit) submit.disabled = false;
 });
 
 const proGateDialog = $("#pro-gate-dialog");
@@ -294,18 +399,21 @@ function openProGate() {
 $$('[data-open-pro]').forEach(button => button.addEventListener("click", openProGate));
 $$('[data-close-pro]').forEach(button => button.addEventListener("click", () => proGateDialog.close()));
 $$('[data-close-pro-area]').forEach(button => button.addEventListener("click", () => proAreaDialog.close()));
-$("#pro-gate-form").addEventListener("submit", event => {
+$("#pro-gate-form").addEventListener("submit", async event => {
   event.preventDefault();
   const email = $("#pro-email").value.trim().toLowerCase();
   const code = $("#pro-code").value.trim().toUpperCase();
   trackEvent("pro_gate_attempted", { has_email: Boolean(email), code_length: code.length });
-  const match = (window.GH600_ACCESS_CODES || []).find(entry => entry.code.toUpperCase() === code && (entry.email === "*" || entry.email.toLowerCase() === email));
-  if (!match) {
+  const remote = await apiRequest("/access/verify", { email, code });
+  const localMatch = !backend.enabled && (window.GH600_ACCESS_CODES || []).find(entry => entry.code.toUpperCase() === code && (entry.email === "*" || entry.email.toLowerCase() === email));
+  if (!remote?.ok && !localMatch) {
     $("#pro-gate-message").textContent = "That email/code pair is not active. Check the code or contact support.";
     return;
   }
   localStorage.setItem("gh600lab-pro-access", "granted");
   localStorage.setItem("gh600lab-pro-email", email);
+  localStorage.setItem("gh600lab-known-email", email);
+  trackEvent("pro_gate_unlocked", { plan: remote?.plan || localMatch?.plan || "founder" });
   proGateDialog.close();
   proAreaDialog.showModal();
 });
@@ -317,9 +425,12 @@ $("#start-pro-lab").addEventListener("click", () => {
 const issueDialog = $("#issue-dialog");
 $$('[data-open-issue]').forEach(button => button.addEventListener("click", () => issueDialog.showModal()));
 $$('[data-close-issue]').forEach(button => button.addEventListener("click", () => issueDialog.close()));
-$("#issue-form").addEventListener("submit", event => {
+$("#issue-form").addEventListener("submit", async event => {
   event.preventDefault();
-  saveLocalRecord("gh600lab-issues", { email: $("#issue-email").value.trim(), message: $("#issue-text").value.trim() });
+  const report = { email: $("#issue-email").value.trim(), message: $("#issue-text").value.trim(), path: `${window.location.pathname}${window.location.search}`, session_id: sessionId };
+  saveLocalRecord("gh600lab-issues", report);
+  await apiRequest("/issue-report", report);
+  trackEvent("issue_reported", { path: report.path });
   issueDialog.close();
   event.target.reset();
   showToast("Issue saved — thank you for improving the lab.");
@@ -331,3 +442,5 @@ function showToast(message) {
   toast.classList.add("show");
   setTimeout(() => toast.classList.remove("show"), 3000);
 }
+
+trackEvent("landing_viewed", { path: `${window.location.pathname}${window.location.search}`, ...attribution });
