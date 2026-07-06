@@ -24,7 +24,11 @@ export async function POST(request) {
     const payload = attemptPayload(body);
     if (!payload.session_id) throw new HttpError(400, "session_id is required");
     if (body.attempt_id) {
-      const rows = await update("diagnostic_attempts", { id: `eq.${text(body.attempt_id, 80)}` }, payload);
+      const rows = await update(
+        "diagnostic_attempts",
+        { id: `eq.${text(body.attempt_id, 80)}`, session_id: `eq.${payload.session_id}` },
+        payload
+      );
       if (!rows.length) throw new HttpError(404, "Diagnostic attempt not found");
       return json({ ok: true, attempt_id: rows[0].id });
     }

@@ -55,6 +55,8 @@ audit_log: true`}, q:"A maintenance agent can format code, rotate production sec
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => HTML_ESCAPES[char]);
 
 const backend = window.GH600_BACKEND || { enabled: false, apiBase: "/api" };
 const sessionId = localStorage.getItem("gh600lab-session-id") || (crypto.randomUUID?.() || `session-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -75,7 +77,7 @@ async function apiRequest(path, payload) {
       body: JSON.stringify(payload)
     });
     const data = await response.json().catch(() => ({ ok: false, error: "Unexpected server response" }));
-    return response.ok ? data : { ...data, ok: false };
+    return response.ok ? data : { ...data, ok: false, status: response.status };
   } catch (error) {
     console.warn(`GH600 API ${path} unavailable`, error);
     return null;
@@ -154,7 +156,6 @@ let answers = [];
 let locked = false;
 let timer = 0;
 let timerId = null;
-let quizMode = "diagnostic";
 let pendingResult = null;
 
 function shuffle(items) {
@@ -175,14 +176,12 @@ function buildDiagnostic() {
   });
 }
 
-function startQuiz(customSet = null) {
-  const isPro = Array.isArray(customSet);
-  quizMode = isPro ? "pro" : "diagnostic";
-  quizSet = isPro ? customSet : buildDiagnostic();
+function startQuiz() {
+  quizSet = buildDiagnostic();
   quizIndex = 0;
   answers = [];
-  timer = (isPro ? 18 : 8) * 60;
-  if (!isPro) trackEvent("diagnostic_started", { question_count: quizSet.length });
+  timer = 8 * 60;
+  trackEvent("diagnostic_started", { question_count: quizSet.length });
   clearInterval(timerId);
   timerId = setInterval(() => {
     timer = Math.max(0, timer - 1);
@@ -216,13 +215,13 @@ function renderQuestion() {
       </aside>
       <div class="question-main">
         <span class="question-kicker">${item.artifact ? "ARTIFACT LAB" : "PRODUCTION SCENARIO"} · CHOOSE ONE</span>
-        ${item.artifact ? `<div class="question-artifact"><div><span>${item.artifact.name}</span><small>INSPECT THIS ARTIFACT</small></div><pre><code>${item.artifact.code}</code></pre></div>` : ""}
-        <h2>${item.q}</h2>
-        <div class="answer-list">${item.a.map((answer, i) => `<button class="answer-option" data-answer="${i}"><span>${String.fromCharCode(65+i)}</span><b>${answer}</b></button>`).join("")}</div>
+        ${item.artifact ? `<div class="question-artifact"><div><span>${escapeHtml(item.artifact.name)}</span><small>INSPECT THIS ARTIFACT</small></div><pre><code>${escapeHtml(item.artifact.code)}</code></pre></div>` : ""}
+        <h2>${escapeHtml(item.q)}</h2>
+        <div class="answer-list">${item.a.map((answer, i) => `<button class="answer-option" data-answer="${i}"><span>${String.fromCharCode(65+i)}</span><b>${escapeHtml(answer)}</b></button>`).join("")}</div>
         <div id="explanation-slot"></div>
         <div class="question-actions"><button class="button button-dark" id="submit-answer" disabled>Check decision <span>→</span></button></div>
       </div>
-      <aside class="objective-panel"><span>BLUEPRINT OBJECTIVE</span><h4>${item.objective}</h4><div class="objective-line" style="--objective:${60 + item.d * 5}%"><i></i></div><p>Original scenario mapped to the public GH-600 skills outline and supporting documentation.</p></aside>
+      <aside class="objective-panel"><span>BLUEPRINT OBJECTIVE</span><h4>${escapeHtml(item.objective)}</h4><div class="objective-line" style="--objective:${60 + item.d * 5}%"><i></i></div><p>Original scenario mapped to the public GH-600 skills outline and supporting documentation.</p></aside>
     </section>`;
 
   $$("[data-answer]", quizBody).forEach(button => button.addEventListener("click", () => {
@@ -253,7 +252,7 @@ function checkAnswer() {
     if (i === item.c) button.classList.add("correct");
     if (i === selected && !correct) button.classList.add("wrong");
   });
-  $("#explanation-slot").innerHTML = `<div class="explanation ${correct ? "correct-exp" : "wrong-exp"}"><strong>${correct ? "Good call." : "Not quite."}</strong><p>${item.why}</p></div>`;
+  $("#explanation-slot").innerHTML = `<div class="explanation ${correct ? "correct-exp" : "wrong-exp"}"><strong>${correct ? "Good call." : "Not quite."}</strong><p>${escapeHtml(item.why)}</p></div>`;
   const action = $("#submit-answer");
   action.disabled = false;
   action.innerHTML = quizIndex === quizSet.length - 1 ? "View readiness report <span>→</span>" : "Next scenario <span>→</span>";
@@ -271,20 +270,153 @@ function finishQuiz() {
     const results = answers.filter(a => a.domain === d.id);
     return results.length ? Math.round(results.filter(a => a.correct).length / results.length * 100) : 0;
   });
-  const result = { score, correct, domainScores, answers: [...answers], total: quizSet.length, date: new Date().toISOString(), mode: quizMode };
+  const result = { score, correct, domainScores, answers: [...answers], total: quizSet.length, date: new Date().toISOString(), mode: "diagnostic" };
   pendingResult = result;
   localStorage.setItem("gh600lab-last-result", JSON.stringify(result));
-  if (quizMode === "diagnostic") {
-    trackEvent("diagnostic_completed", { score, correct, question_count: quizSet.length });
-    result.attemptRequest = apiRequest("/diagnostic/complete", diagnosticPayload(result)).then(response => {
-      if (response?.ok) result.attemptId = response.attempt_id;
-      return response;
-    });
-  }
-  $("#quiz-progress-label").textContent = quizMode === "pro" ? "Pro lab complete" : "Diagnostic complete";
+  trackEvent("diagnostic_completed", { score, correct, question_count: quizSet.length });
+  result.attemptRequest = apiRequest("/diagnostic/complete", diagnosticPayload(result)).then(response => {
+    if (response?.ok) result.attemptId = response.attempt_id;
+    return response;
+  });
+  $("#quiz-progress-label").textContent = "Diagnostic complete";
   $("#quiz-progress-bar").style.width = "100%";
-  if (quizMode === "pro") renderDetailedReport(result);
-  else renderReportGate(result);
+  renderReportGate(result);
+}
+
+const MOCK_LABELS = {
+  MOCK_1: "Mock Exam 1", MOCK_2: "Mock Exam 2", MOCK_3: "Mock Exam 3",
+  MOCK_4: "Mock Exam 4", MOCK_5: "Mock Exam 5", MOCK_6: "Mock Exam 6",
+  DRILL: "Targeted Drills"
+};
+const MOCK_LENGTHS = {
+  MOCK_1: 40, MOCK_2: 40, MOCK_3: 40, MOCK_4: 40, MOCK_5: 40, MOCK_6: 40, DRILL: 60
+};
+function mocksForPlan(plan) {
+  if (plan === "pro" || plan === "team_pack") return ["MOCK_1", "MOCK_2", "MOCK_3", "MOCK_4", "MOCK_5", "MOCK_6", "DRILL"];
+  if (plan === "founding_access") return ["MOCK_1", "MOCK_2", "MOCK_3"];
+  return [];
+}
+
+let currentProScenario = null;
+let proAnswers = [];
+let proAttemptCount = 0;
+let proScenarioStartedAt = 0;
+let currentMockId = null;
+
+async function startProLab(mockId) {
+  currentMockId = mockId;
+  proAnswers = [];
+  proAttemptCount = 0;
+  timer = 18 * 60;
+  clearInterval(timerId);
+  timerId = setInterval(() => {
+    timer = Math.max(0, timer - 1);
+    const timerEl = $("#question-timer");
+    if (timerEl) timerEl.textContent = formatTime(timer);
+    if (timer === 0) finishProLab();
+  }, 1000);
+  if (!quizDialog.open) quizDialog.showModal();
+  document.body.style.overflow = "hidden";
+  await renderNextProScenario();
+}
+
+async function renderNextProScenario() {
+  locked = false;
+  selected = null;
+  const token = localStorage.getItem("gh600lab-session-token") || "";
+  const response = await apiRequest("/scenarios/next", { token, session_id: sessionId, mock_id: currentMockId });
+  if (response?.done) { finishProLab(); return; }
+  if (!response?.ok || !response.scenario) { expireProLab(); return; }
+  currentProScenario = response.scenario;
+  proScenarioStartedAt = Date.now();
+  proAttemptCount++;
+  trackEvent("paid_scenario_started", { scenario_id: currentProScenario.id, mock_id: currentMockId });
+  const domain = domains[currentProScenario.primary_domain - 1];
+  const artifact = currentProScenario.artifact_type === "code" && currentProScenario.artifact_content
+    ? JSON.parse(currentProScenario.artifact_content) : null;
+  const mockLength = MOCK_LENGTHS[currentMockId] || 40;
+  $("#quiz-progress-label").textContent = `${MOCK_LABELS[currentMockId] || "Pro lab"} · scenario ${proAttemptCount}`;
+  $("#quiz-progress-bar").style.width = `${Math.min(100, (proAttemptCount / mockLength) * 100)}%`;
+  quizBody.innerHTML = `
+    <section class="quiz-question" style="--domain-color:${domain.color}">
+      <aside class="quiz-sidebar">
+        <span class="domain-chip">DOMAIN 0${domain.id}</span>
+        <h3>${domain.name}</h3><p>${domain.desc}</p>
+        <div class="timer"><small>TIME LEFT</small><span id="question-timer">${formatTime(timer)}</span></div>
+        <p class="quiz-legal">Pro lab · Server-graded<br>Public-doc aligned<br>Hands-on readiness</p>
+      </aside>
+      <div class="question-main">
+        <span class="question-kicker">${artifact ? "ARTIFACT LAB" : "PRODUCTION SCENARIO"} · CHOOSE ONE</span>
+        ${artifact ? `<div class="question-artifact"><div><span>${escapeHtml(artifact.name)}</span><small>INSPECT THIS ARTIFACT</small></div><pre><code>${escapeHtml(artifact.code)}</code></pre></div>` : ""}
+        <h2>${escapeHtml(currentProScenario.prompt)}</h2>
+        <div class="answer-list">${currentProScenario.options.map((answer, i) => `<button class="answer-option" data-answer="${i}"><span>${String.fromCharCode(65 + i)}</span><b>${escapeHtml(answer)}</b></button>`).join("")}</div>
+        <div id="explanation-slot"></div>
+        <div class="question-actions"><button class="button button-dark" id="submit-answer" disabled>Check decision <span>→</span></button></div>
+      </div>
+      <aside class="objective-panel"><span>BLUEPRINT OBJECTIVE</span><h4>${escapeHtml(currentProScenario.objective)}</h4><div class="objective-line" style="--objective:${60 + domain.id * 5}%"><i></i></div><p>Original scenario mapped to the public GH-600 skills outline and supporting documentation.</p></aside>
+    </section>`;
+
+  $$("[data-answer]", quizBody).forEach(button => button.addEventListener("click", () => {
+    if (locked) return;
+    selected = Number(button.dataset.answer);
+    $$("[data-answer]", quizBody).forEach(b => b.classList.remove("selected"));
+    button.classList.add("selected");
+    $("#submit-answer").disabled = false;
+  }));
+  $("#submit-answer").addEventListener("click", checkProAnswer);
+}
+
+async function checkProAnswer() {
+  if (selected === null || locked) return;
+  locked = true;
+  const action = $("#submit-answer");
+  action.disabled = true;
+  const token = localStorage.getItem("gh600lab-session-token") || "";
+  const durationMs = Date.now() - proScenarioStartedAt;
+  const response = await apiRequest("/scenarios/answer", {
+    token, session_id: sessionId, scenario_id: currentProScenario.id, scenario_version: currentProScenario.version,
+    selected_index: selected, duration_ms: durationMs
+  });
+  const correct = Boolean(response?.correct);
+  const correctIndex = response?.correct_index ?? selected;
+  proAnswers.push({ scenario_id: currentProScenario.id, domain: currentProScenario.primary_domain, correct });
+  $$("[data-answer]", quizBody).forEach((button, i) => {
+    button.disabled = true;
+    if (i === correctIndex) button.classList.add("correct");
+    if (i === selected && !correct) button.classList.add("wrong");
+  });
+  $("#explanation-slot").innerHTML = `<div class="explanation ${correct ? "correct-exp" : "wrong-exp"}"><strong>${correct ? "Good call." : "Not quite."}</strong><p>${escapeHtml(response?.explanation || "")}</p></div>`;
+  trackEvent("paid_scenario_completed", { scenario_id: currentProScenario.id, mock_id: currentMockId, correct });
+  action.disabled = false;
+  const mockLength = MOCK_LENGTHS[currentMockId] || 40;
+  const mockComplete = proAttemptCount >= mockLength;
+  action.innerHTML = mockComplete ? "View readiness report <span>→</span>" : "Next scenario <span>→</span>";
+  action.onclick = mockComplete ? () => finishProLab() : () => renderNextProScenario();
+}
+
+function finishProLab() {
+  clearInterval(timerId);
+  const correct = proAnswers.filter(a => a.correct).length;
+  const total = proAnswers.length || 1;
+  const score = Math.round((correct / total) * 100);
+  const domainScores = domains.map(d => {
+    const results = proAnswers.filter(a => a.domain === d.id);
+    return results.length ? Math.round(results.filter(a => a.correct).length / results.length * 100) : 0;
+  });
+  const result = { score, correct, domainScores, answers: [...proAnswers], total: proAnswers.length, date: new Date().toISOString(), mode: "pro", mockId: currentMockId };
+  trackEvent("pro_lab_completed", { score, correct, total: proAnswers.length, mock_id: currentMockId });
+  $("#quiz-progress-label").textContent = `${MOCK_LABELS[currentMockId] || "Pro lab"} complete`;
+  $("#quiz-progress-bar").style.width = "100%";
+  renderDetailedReport(result);
+}
+
+function expireProLab() {
+  clearInterval(timerId);
+  closeQuiz();
+  localStorage.removeItem("gh600lab-session-token");
+  const message = $("#pro-gate-message");
+  if (message) message.textContent = "Your session expired — please re-enter your email and access code.";
+  proGateDialog.showModal();
 }
 
 function renderReportGate(result) {
@@ -318,10 +450,12 @@ function renderDetailedReport(result) {
       <div class="result-details"><span>YOUR READINESS MAP</span><h3>Focus next on ${weakest.name}.</h3><p class="result-summary">Strongest: ${strongest.name}. Weakest: ${weakest.name}. Your next three days should close the highest-impact gap before adding more breadth.</p>
         <div class="result-domain-list">${domains.map((d,i) => `<div class="result-domain" style="--domain-color:${d.color}"><span>${d.name}</span><div><i style="width:${result.domainScores[i]}%"></i></div><b>${result.domainScores[i]}%</b></div>`).join("")}</div>
         <div class="result-cram"><b>3-DAY STUDY PLAN</b><p><span>01</span> Review ${weakest.short} objectives and linked official documentation.</p><p><span>02</span> Retake missed artifact labs without notes.</p><p><span>03</span> Complete a timed mixed-domain run and review every distractor.</p></div>
-        <div class="result-actions"><button class="button button-dark" id="retry-quiz">Retake ${result.mode === "pro" ? "Pro lab" : "diagnostic"}</button>${result.mode === "pro" ? "" : '<button class="button button-primary" id="unlock-from-results">Buy founding access — $29 <span>→</span></button>'}</div>
+        <div class="result-actions"><button class="button button-dark" id="retry-quiz">Retake ${result.mode === "pro" ? (MOCK_LABELS[result.mockId] || "Pro lab") : "diagnostic"}</button>${result.mode === "pro" ? '<button class="button button-outline-light" id="back-to-mocks">Choose another mock</button>' : '<button class="button button-primary" id="unlock-from-results">Buy founding access — $29 <span>→</span></button>'}</div>
       </div>
     </section>`;
-  $("#retry-quiz").addEventListener("click", () => startQuiz(result.mode === "pro" ? shuffle(questions) : null));
+  $("#retry-quiz").addEventListener("click", () => { if (result.mode === "pro") startProLab(result.mockId); else startQuiz(); });
+  const backToMocks = $("#back-to-mocks");
+  if (backToMocks) backToMocks.addEventListener("click", () => { closeQuiz(); openProGate(); });
   const unlockButton = $("#unlock-from-results");
   if (unlockButton) unlockButton.addEventListener("click", () => { trackEvent("founding_access_clicked", { source: "results" }); closeQuiz(); openAccess("founder"); });
 }
@@ -348,7 +482,7 @@ function updatePlanFields() {
   $("#team-fields").hidden = plan !== "team";
   $("#cram-fields").hidden = plan !== "cram";
   const action = $("#access-form button[type='submit']");
-  action.firstChild.textContent = plan === "team" ? "Reserve team pack " : plan === "cram" ? "Request cram slot " : "Continue to founding access ";
+  action.firstChild.textContent = plan === "team" ? "Reserve team pack " : plan === "cram" ? "Request cram slot " : plan === "pro" ? "Continue to Pro checkout " : "Continue to founding access ";
 }
 function closeAccess() { accessDialog.close(); }
 $$('[data-open-access]').forEach(button => button.addEventListener("click", () => {
@@ -363,6 +497,7 @@ $("#access-form").addEventListener("submit", async event => {
   event.preventDefault();
   const email = $("#access-email").value.trim();
   const plan = $("#access-plan").value;
+  trackEvent("checkout_started", { plan });
   const submit = event.submitter;
   if (submit) { submit.disabled = true; submit.firstChild.textContent = "Preparing checkout… "; }
   const metadata = plan === "team" ? {
@@ -379,7 +514,7 @@ $("#access-form").addEventListener("submit", async event => {
   const intent = await apiRequest("/checkout-intent", { email, plan, source_page: `${window.location.pathname}${window.location.search}`, metadata });
   const checkoutUrl = intent?.redirect_url || window.GH600_CHECKOUT?.[plan];
   if (checkoutUrl) {
-    trackEvent("checkout_redirected", { plan, provider: intent?.redirect_url ? "razorpay" : "local_config" });
+    trackEvent("checkout_redirected", { plan, provider: intent?.provider || "local_config" });
     window.location.assign(checkoutUrl);
     return;
   }
@@ -392,9 +527,31 @@ $("#access-form").addEventListener("submit", async event => {
 
 const proGateDialog = $("#pro-gate-dialog");
 const proAreaDialog = $("#pro-area-dialog");
-function openProGate() {
-  if (localStorage.getItem("gh600lab-pro-access") === "granted") proAreaDialog.showModal();
-  else proGateDialog.showModal();
+
+function renderMockPicker(plan) {
+  localStorage.setItem("gh600lab-plan", plan);
+  const mocks = mocksForPlan(plan);
+  const mockCount = mocks.filter(id => id !== "DRILL").length;
+  $("#pro-area-kicker").textContent = plan === "founding_access" ? "PRO LAB · FOUNDING ACCESS" : "PRO LAB · FULL BANK";
+  $("#pro-area-heading").textContent = mocks.includes("DRILL")
+    ? `${mockCount} mock exams + targeted drills are unlocked.`
+    : `${mockCount} mock exams are unlocked.`;
+  $("#mock-picker").innerHTML = mocks.map(mockId => `<button class="button button-outline-light" data-mock="${mockId}">${MOCK_LABELS[mockId]} <span>→</span></button>`).join("")
+    || `<p>No mock exams are included on this plan yet.</p>`;
+  $$("[data-mock]", $("#mock-picker")).forEach(button => button.addEventListener("click", () => {
+    proAreaDialog.close();
+    startProLab(button.dataset.mock);
+  }));
+}
+
+async function openProGate() {
+  const token = localStorage.getItem("gh600lab-session-token");
+  if (token) {
+    const response = await apiRequest("/access/session", { token });
+    if (response?.ok) { renderMockPicker(response.plan); proAreaDialog.showModal(); return; }
+    localStorage.removeItem("gh600lab-session-token");
+  }
+  proGateDialog.showModal();
 }
 $$('[data-open-pro]').forEach(button => button.addEventListener("click", openProGate));
 $$('[data-close-pro]').forEach(button => button.addEventListener("click", () => proGateDialog.close()));
@@ -405,21 +562,17 @@ $("#pro-gate-form").addEventListener("submit", async event => {
   const code = $("#pro-code").value.trim().toUpperCase();
   trackEvent("pro_gate_attempted", { has_email: Boolean(email), code_length: code.length });
   const remote = await apiRequest("/access/verify", { email, code });
-  const localMatch = !backend.enabled && (window.GH600_ACCESS_CODES || []).find(entry => entry.code.toUpperCase() === code && (entry.email === "*" || entry.email.toLowerCase() === email));
-  if (!remote?.ok && !localMatch) {
+  if (!remote?.ok) {
     $("#pro-gate-message").textContent = "That email/code pair is not active. Check the code or contact support.";
     return;
   }
-  localStorage.setItem("gh600lab-pro-access", "granted");
+  localStorage.setItem("gh600lab-session-token", remote.token);
   localStorage.setItem("gh600lab-pro-email", email);
   localStorage.setItem("gh600lab-known-email", email);
-  trackEvent("pro_gate_unlocked", { plan: remote?.plan || localMatch?.plan || "founder" });
+  trackEvent("pro_gate_unlocked", { plan: remote.plan });
   proGateDialog.close();
+  renderMockPicker(remote.plan);
   proAreaDialog.showModal();
-});
-$("#start-pro-lab").addEventListener("click", () => {
-  proAreaDialog.close();
-  startQuiz(shuffle(questions));
 });
 
 const issueDialog = $("#issue-dialog");

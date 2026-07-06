@@ -1,5 +1,6 @@
 import { handleError, HttpError, json, readJson, requireEmail, text } from "../_lib/http.js";
-import { select, update } from "../_lib/supabase.js";
+import { findActiveEntitlement, grantEntitlement, issueSession, redeemAccessCode, registerFailedCode } from "../_lib/entitlements.js";
+import { resolvePlan } from "../_lib/plans.js";
 
 export async function POST(request) {
   try {
@@ -7,14 +8,34 @@ export async function POST(request) {
     const email = requireEmail(body.email);
     const code = text(body.code, 100).toUpperCase();
     if (!code) throw new HttpError(400, "Access code is required");
-    const rows = await select("access_codes", { code: `eq.${code}`, active: "eq.true", limit: "1" });
-    const access = rows[0];
-    const validEmail = access && (access.email === "*" || access.email.toLowerCase() === email);
-    const notExpired = access && (!access.expires_at || new Date(access.expires_at) > new Date());
-    const usesAvailable = access && (access.max_uses == null || access.uses < access.max_uses);
-    if (!access || !validEmail || !notExpired || !usesAvailable) return json({ ok: false, error: "That email/code pair is not active" }, 401);
-    await update("access_codes", { id: `eq.${access.id}` }, { uses: access.uses + 1, last_used_at: new Date().toISOString() });
-    return json({ ok: true, plan: access.plan });
+
+    // Per-buyer reference: a shared max_uses>1 code still creates one
+    // entitlement per email, and a returning buyer (cleared storage, expired
+    // 30-day session) gets a fresh token here without burning another use.
+    const reference = `code:${code}:${email}`;
+    const existingEntitlement = await findActiveEntitlement({ email, reference });
+    if (existingEntitlement) {
+      const session = await issueSession(existingEntitlement);
+      return json({ ok: true, plan: existingEntitlement.plan, token: session.token, expires_at: session.expires_at });
+    }
+
+    const redeemed = await redeemAccessCode(code, email);
+    if (!redeemed) {
+      await registerFailedCode(code, email);
+      return json({ ok: false, error: "That email/code pair is not active" }, 401);
+    }
+    const plan = resolvePlan(redeemed.plan);
+    if (!plan) throw new HttpError(422, "Unknown plan on access code");
+
+    const entitlement = await grantEntitlement({
+      email,
+      plan: plan.id,
+      source: "manual",
+      granted_by: `code:${code}`,
+      reference
+    });
+    const session = await issueSession(entitlement);
+    return json({ ok: true, plan: plan.id, token: session.token, expires_at: session.expires_at });
   } catch (error) {
     return handleError(error);
   }
