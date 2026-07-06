@@ -215,15 +215,22 @@ approval_required: false</code></pre>
           <div class="popular">FIRST 100 ONLY</div>
           <span class="plan">FOUNDING ACCESS</span>
           <h3>$29<small> lifetime</small></h3>
-          <p>Get today’s 18 live scenarios plus every founding-window scenario drop.</p>
-          <ul><li>18 live original scenarios today</li><li>Future artifact scenario drops</li><li>Detailed readiness report</li><li>Full 18-question Pro lab</li><li>Price rises to $49 after founding</li></ul>
+          <p>120 questions across 3 full-length mock exams.</p>
+          <ul><li>120 original scenarios · MOCK 1–3</li><li>3 timed 40-question mock exams</li><li>Detailed readiness report</li><li>Server-graded, one scenario at a time</li><li>Upgrade to Pro anytime for the rest</li></ul>
           <button class="button button-acid" data-open-access data-plan="founder">Buy founding access <span>→</span></button>
+        </article>
+        <article class="price-card">
+          <span class="plan">PRO</span>
+          <h3>$49<small> once</small></h3>
+          <p>The full 300-question bank — every mock plus targeted drills.</p>
+          <ul><li>300 original scenarios · MOCK 1–6 + drills</li><li>6 timed 40-question mock exams</li><li>60 targeted weak-domain drills</li><li>Detailed readiness report</li><li>Server-graded, one scenario at a time</li></ul>
+          <button class="button button-outline-light" data-open-access data-plan="pro">Buy Pro <span>→</span></button>
         </article>
         <article class="price-card">
           <span class="plan">TEAM PACK</span>
           <h3>$149<small> once</small></h3>
           <p>For partners, consultants and training cohorts.</p>
-          <ul><li>10 learner seats</li><li>Manager readiness snapshot</li><li>Domain-level team gaps</li><li>CSV progress export</li><li>Invoice included</li></ul>
+          <ul><li>10 learner seats</li><li>Pro content set (all 300)</li><li>Manager readiness snapshot</li><li>Domain-level team gaps</li><li>Invoice included</li></ul>
           <button class="button button-outline-light" data-open-access data-plan="team">Reserve team pack</button>
         </article>
       </div>
@@ -262,7 +269,7 @@ approval_required: false</code></pre>
     <p>Enter your email, then continue to the configured checkout. If payment is not connected yet, your founding request is saved.</p>
     <form id="access-form">
       <label>Email address<input type="email" id="access-email" placeholder="you@company.com" required></label>
-      <label>Plan<select id="access-plan"><option value="founder">Founding Access — $29 lifetime</option><option value="team">Team Pack — $149 once</option><option value="cram">Urgent Cram Call — $99</option></select></label>
+      <label>Plan<select id="access-plan"><option value="founder">Founding Access — $29 lifetime</option><option value="pro">Pro — $49 once</option><option value="team">Team Pack — $149 once</option><option value="cram">Urgent Cram Call — $99</option></select></label>
       <div class="conditional-fields" id="team-fields" hidden>
         <label>Company or cohort<input type="text" id="team-company" placeholder="Acme Consulting"></label>
         <label>Expected learners<input type="number" id="team-size" min="2" max="100" placeholder="10"></label>
@@ -293,11 +300,10 @@ approval_required: false</code></pre>
 
   <dialog class="pro-modal" id="pro-area-dialog">
     <button class="icon-button modal-close" data-close-pro-area aria-label="Close">×</button>
-    <span class="modal-kicker">PRO LAB · FOUNDING BUILD</span>
-    <h2>All 18 live scenarios are unlocked.</h2>
-    <p>Your Pro run includes three questions from every official domain and all six artifact labs.</p>
-    <div class="pro-stats"><div><strong>18</strong><span>live scenarios</span></div><div><strong>6</strong><span>artifact labs</span></div><div><strong>18m</strong><span>target time</span></div></div>
-    <button class="button button-primary" id="start-pro-lab">Start full Pro lab <span>→</span></button>
+    <span class="modal-kicker" id="pro-area-kicker">PRO LAB</span>
+    <h2 id="pro-area-heading">Your scenarios are unlocked.</h2>
+    <p id="pro-area-copy">Pick a mock exam or drill set to begin — each is graded question by question on the server.</p>
+    <div class="mock-picker" id="mock-picker"></div>
   </dialog>
 
   <dialog class="access-modal" id="issue-dialog">

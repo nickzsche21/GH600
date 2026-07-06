@@ -193,7 +193,7 @@ nav a:hover { color: var(--ink); }
 .pricing { width: 100%; max-width: none; margin-top: 25px; padding: 120px max(24px, calc((100% - 1180px) / 2)); background: var(--ink); color: white; }
 .light { color: #d7ddd7; }
 .section-heading.light p { color: #9ba39b; }
-.pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); align-items: stretch; gap: 13px; margin-top: 58px; }
+.pricing-grid { display: grid; grid-template-columns: repeat(4, 1fr); align-items: stretch; gap: 13px; margin-top: 58px; }
 .price-card { border: 1px solid rgba(255,255,255,.15); border-radius: 14px; padding: 28px; position: relative; }
 .price-card.featured { background: white; color: var(--ink); transform: translateY(-10px); }
 .popular { position: absolute; top: -11px; right: 20px; background: var(--acid); color: var(--ink); padding: 6px 10px; border-radius: 99px; font-family: "DM Mono", monospace; font-size: 8px; }
@@ -312,6 +312,8 @@ dialog::backdrop { background: rgba(12, 16, 13, .75); backdrop-filter: blur(8px)
 .pro-stats strong { color: var(--acid); font-size: 25px; }
 .pro-stats span { color: #8f9890; font-size: 9px; }
 .pro-modal .button { width: 100%; }
+.mock-picker { display: grid; gap: 9px; margin-top: 25px; }
+.mock-picker .button { width: 100%; text-align: left; }
 .report-gate { max-width: 560px; margin: 0 auto; padding: 36px; border: 1px solid var(--line); border-radius: 15px; background: white; box-shadow: 0 18px 45px rgba(18,23,19,.1); }
 .report-gate > span { color: var(--muted); font: 9px "DM Mono", monospace; }
 .report-gate h2 { font-size: 34px; line-height: 1.1; letter-spacing: -.055em; margin: 15px 0 9px; }

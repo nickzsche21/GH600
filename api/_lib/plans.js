@@ -1,17 +1,87 @@
+const founder = {
+  id: "founding_access",
+  label: "Founding Access",
+  amount: 29,
+  currency: "USD",
+  provider: "paddle",
+  checkoutEnv: "PADDLE_CHECKOUT_FOUNDING",
+  priceEnv: "PADDLE_PRICE_FOUNDING",
+  legacyEnv: "RAZORPAY_FOUNDING_URL"
+};
+const team = {
+  id: "team_pack",
+  label: "Team Pack",
+  amount: 149,
+  currency: "USD",
+  provider: "wise",
+  checkoutEnv: null,
+  priceEnv: null,
+  legacyEnv: "RAZORPAY_TEAM_URL"
+};
+const cram = {
+  id: "cram_call",
+  label: "Urgent Cram Call",
+  amount: 99,
+  currency: "USD",
+  provider: "wise",
+  checkoutEnv: null,
+  priceEnv: null,
+  legacyEnv: "RAZORPAY_CRAM_URL"
+};
+const pro = {
+  id: "pro",
+  label: "Pro",
+  amount: 49,
+  currency: "USD",
+  provider: "paddle",
+  checkoutEnv: "PADDLE_CHECKOUT_PRO",
+  priceEnv: "PADDLE_PRICE_PRO",
+  legacyEnv: null
+};
+
 const plans = {
-  founder: { id: "founding_access", label: "Founding Access", amount: 29, currency: "USD", env: "RAZORPAY_FOUNDING_URL" },
-  founding_access: { id: "founding_access", label: "Founding Access", amount: 29, currency: "USD", env: "RAZORPAY_FOUNDING_URL" },
-  team: { id: "team_pack", label: "Team Pack", amount: 149, currency: "USD", env: "RAZORPAY_TEAM_URL" },
-  team_pack: { id: "team_pack", label: "Team Pack", amount: 149, currency: "USD", env: "RAZORPAY_TEAM_URL" },
-  cram: { id: "cram_call", label: "Urgent Cram Call", amount: 99, currency: "USD", env: "RAZORPAY_CRAM_URL" },
-  cram_call: { id: "cram_call", label: "Urgent Cram Call", amount: 99, currency: "USD", env: "RAZORPAY_CRAM_URL" }
+  founder, founding_access: founder,
+  team, team_pack: team,
+  cram, cram_call: cram,
+  pro
 };
 
 export function resolvePlan(value) {
   return plans[String(value || "").toLowerCase()] || null;
 }
 
-export function checkoutUrl(plan) {
-  const value = process.env[plan.env]?.trim();
+export function resolvePlanByPriceId(priceId) {
+  return Object.values(plans).find(plan => plan.priceEnv && process.env[plan.priceEnv] === priceId) || null;
+}
+
+function readHttpsUrl(envName) {
+  if (!envName) return null;
+  const value = process.env[envName]?.trim();
   return value && /^https:\/\//i.test(value) ? value : null;
+}
+
+export function checkoutUrl(plan) {
+  return readHttpsUrl(plan.checkoutEnv) || readHttpsUrl(plan.legacyEnv);
+}
+
+// Premium bank v2 (`gh600_scenarios_v2`) content tiers, widest first — a plan
+// may only ever be served rows whose `plan_required` appears in its list.
+// Free tier (no entitlement) has no v2 rows; it stays on the inline app.js bank.
+export function contentTiers(planId) {
+  switch (planId) {
+    case "pro":
+    case "team_pack": return ["free_diagnostic", "founder", "pro"]; // 300 · MOCK_1-6 + drills
+    case "founding_access": return ["free_diagnostic", "founder"]; // 120 · MOCK_1-3
+    default: return [];
+  }
+}
+
+// Which `mock_id` values a plan may request from /api/scenarios/next.
+export function allowedMocks(planId) {
+  switch (planId) {
+    case "pro":
+    case "team_pack": return ["MOCK_1", "MOCK_2", "MOCK_3", "MOCK_4", "MOCK_5", "MOCK_6", "DRILL"];
+    case "founding_access": return ["MOCK_1", "MOCK_2", "MOCK_3"];
+    default: return [];
+  }
 }

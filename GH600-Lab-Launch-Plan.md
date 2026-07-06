@@ -21,9 +21,12 @@ The moat is practical artifact interpretation, not the number of multiple-choice
 ## Launch pricing
 
 - Free: 12-question diagnostic and six-domain readiness score.
-- Founding Access: $29 lifetime for the first 100 buyers, including 18 live scenarios, future founding-window drops, the full Pro lab and detailed readiness report.
-- Pro after the founding window: $49.
-- Team Pack: $149 once for 10 seats, manager readiness snapshot, domain-gap report and invoice.
+- Founding Access: $29 lifetime for the first 100 buyers — 120 original scenarios across three
+  full-length mock exams (MOCK_1–3) and a detailed readiness report. Upgradeable to Pro anytime.
+- Pro: $49 — the full 300-scenario bank: all six mock exams (MOCK_1–6) plus 60 targeted
+  weak-domain drills.
+- Team Pack: $149 once for 10 seats on the Pro content set, manager readiness snapshot,
+  domain-gap report and invoice.
 - Urgent Cram Call: $99 for a limited 60-minute manual preparation session.
 
 ## Path to $5K launch revenue

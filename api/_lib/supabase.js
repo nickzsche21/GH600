@@ -42,3 +42,7 @@ export function select(table, query) {
 export function update(table, query, patch) {
   return request(table, { method: "PATCH", query, body: patch, prefer: "return=representation" });
 }
+
+export function rpc(name, args = {}) {
+  return request(`rpc/${name}`, { method: "POST", body: args });
+}

@@ -1,5 +1,5 @@
 import { handleError, HttpError, json, readJson, requireEmail, text } from "../_lib/http.js";
-import { select, update } from "../_lib/supabase.js";
+import { grantEntitlement, issueSession, redeemAccessCode, registerFailedCode } from "../_lib/entitlements.js";
 
 export async function POST(request) {
   try {
@@ -7,14 +7,19 @@ export async function POST(request) {
     const email = requireEmail(body.email);
     const code = text(body.code, 100).toUpperCase();
     if (!code) throw new HttpError(400, "Access code is required");
-    const rows = await select("access_codes", { code: `eq.${code}`, active: "eq.true", limit: "1" });
-    const access = rows[0];
-    const validEmail = access && (access.email === "*" || access.email.toLowerCase() === email);
-    const notExpired = access && (!access.expires_at || new Date(access.expires_at) > new Date());
-    const usesAvailable = access && (access.max_uses == null || access.uses < access.max_uses);
-    if (!access || !validEmail || !notExpired || !usesAvailable) return json({ ok: false, error: "That email/code pair is not active" }, 401);
-    await update("access_codes", { id: `eq.${access.id}` }, { uses: access.uses + 1, last_used_at: new Date().toISOString() });
-    return json({ ok: true, plan: access.plan });
+    const redeemed = await redeemAccessCode(code, email);
+    if (!redeemed) {
+      await registerFailedCode(code);
+      return json({ ok: false, error: "That email/code pair is not active" }, 401);
+    }
+    const entitlement = await grantEntitlement({
+      email,
+      plan: redeemed.plan,
+      source: "manual",
+      granted_by: `code:${code}`
+    });
+    const session = await issueSession(entitlement);
+    return json({ ok: true, plan: redeemed.plan, token: session.token, expires_at: session.expires_at });
   } catch (error) {
     return handleError(error);
   }
