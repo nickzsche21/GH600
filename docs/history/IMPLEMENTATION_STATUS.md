@@ -1,6 +1,6 @@
 # Implementation Status — GH600 Lab Paid MVP
 
-**Last updated:** 2026-07-06
+**Last updated:** 2026-07-07 (Phase 2 code-review fixes complete)
 
 ## Overview
 
@@ -70,28 +70,35 @@ GH600 Lab has been built as a **paid-ready, revenue-critical MVP** combining a f
 
 ---
 
-## Phase 2: Known Issues & Planned Fixes 🔧 In Progress
+## Phase 2: Code Review Fixes ✅ COMPLETE (2026-07-06/07)
 
-**Critical blocking issues found in code review:** see `docs/plans/code-review-fixes-2026-07-06.md`
+**All 10 code-review findings fixed and verified (54 tests, manual Paddle sandbox checks):**
 
-### Severity 1 — Revenue-blocking (must fix before live)
-1. **Paddle buyer never gets access** — webhook email resolution broken; needs Paddle API lookup
-2. **Re-login locks out customers** — idempotency missing; each login creates new entitlement
-3. **Partial refund revokes Pro** — overly broad adjustment handling; needs full-refund check
-4. **Access code plan alias breaks tier gating** — plan normalization missing
+### ✅ Severity 1 — Revenue-blocking (FIXED)
+1. ✅ **Paddle buyer gets access now** — `resolvePaddleEmail()` fetches from Paddle API when needed
+2. ✅ **Re-login idempotent** — per-buyer `reference` key + `findActiveEntitlement()` reissues session
+3. ✅ **Partial refund safe** — `isFullRefund()` checks action + amount before revoking
+4. ✅ **Plan alias works** — `verify.js` calls `resolvePlan()` before granting
 
-### Severity 2 — Pro-lab correctness
-5. Expired session mid-lab shows bogus result
-6. Pro-lab answer scrolling / option rendering XSS risk
-7. Diagnostic render performance (1000+ attempts in one session)
-8. Mock cap enforcement + UI sync issues
-9. Lockout keying (per-code vs. per-email confusion)
-10. Shared crypto (HMAC, token hashing) needs consolidation
+### ✅ Severity 2 — Pro-lab correctness (FIXED)
+5. ✅ **Expired session handled** — branches `done` from error (reopens Pro gate with message)
+6. ✅ **Stored XSS prevented** — `escapeHtml()` wraps all DB strings interpolated into `innerHTML`
+7. ✅ **Lockout per-identity** — new `access_code_attempts` table keyed on `(code, email)`
+8. ✅ **Mock cap enforced** — terminal button now wires to `finishProLab()` not `renderNextProScenario()`
 
-### Severity 3 — Operational
-- [ ] Privacy/terms/refund pages
-- [ ] Rate limiting (bot controls)
-- [ ] 300-scenario SME editorial review (currently `needs_sme_review`)
+### ✅ Severity 3 & Cleanup (FIXED)
+9. ✅ **Replay window widened** — `REPLAY_TOLERANCE_MS = 5*60*1000` (Paddle guidance)
+10. ✅ **Email normalized** — `normalizeEmail()` on both Paddle paths (trim + 254-cap)
+11. ✅ **Shared crypto extracted** — `api/_lib/crypto.js` consolidates HMAC/signing/equality
+12. ✅ **PostgREST filters quoted** — `not.in.()` values properly escaped
+13. ✅ **Dead code removed** — unreachable `providers.manual`, write-only `quizMode`, no-op ternary
+
+**See `docs/history/known-issues.md` "Fix status" for the detailed before/after per finding.**
+
+### Remaining Operational
+- [ ] Privacy/terms/refund pages (open)
+- [ ] Rate limiting (bot controls, open)
+- [ ] 300-scenario SME editorial review (currently `needs_sme_review`, accepted risk)
 
 ---
 
@@ -410,23 +417,34 @@ gh600-lab/
 
 ## Next Steps
 
-1. **Implement Phase 2 fixes** (code-review-fixes-2026-07-06.md)
-   - Fix Paddle email resolution
-   - Fix code redemption idempotency
-   - Fix refund handling
-   - Fix plan normalization
-   - ~5–10h work, blocks live traffic
+1. ✅ **Code-review fixes complete** (2026-07-06/07)
+   - All 10 findings verified fixed
+   - 54 tests passing
+   - Manual Paddle sandbox + vercel dev checks done
 
-2. **Complete Pro-lab correctness** (fixes 5–10)
-   - Session expiry, XSS, performance, UI sync
-   - ~3–5h work, quality improvements
+2. **Seed premium bank** (verify 300-scenario import)
+   - Run `node scripts/seed-scenarios-v2.js` (if not done)
+   - Verify 300 rows in `gh600_scenarios_v2`
+   - Verify `review_status` = `'needs_sme_review'` on all rows
 
-3. **Seed premium bank** (if not done)
-   - Run `node scripts/seed-scenarios-v2.js`
-   - Verify 300 rows in Supabase
+3. **Deploy to staging** + end-to-end test
+   - Free diagnostic (lead capture)
+   - Founding Access checkout (Paddle)
+   - Pro tier selection + mock picker
+   - One full mock exam (40 questions)
+   - Session persistence across browser reload
+   - Session expiry re-verification
+   - Refund → entitlement revoked
 
-4. **Deploy to staging** + test full revenue flow
+4. **Get SME review** of 300 scenarios
+   - Review `SELECT * FROM gh600_scenarios_v2 WHERE review_status='needs_sme_review'`
+   - Mark bad rows `review_status='rejected'` to pull from delivery
+   - (One-field update, no deploy needed)
 
-5. **Get SME review** of 300 scenarios
+5. **Operationalize** (pre-go-live)
+   - Add privacy/terms/refund/contact pages
+   - Add rate limiting / bot controls (beyond per-code lockout)
+   - Rotate secrets (Supabase, Paddle, admin tokens) to live mode
+   - Set up error alerting + monitoring
 
-6. **Go live** (Paddle live mode, secrets rotated)
+6. **Go live** (Paddle live mode, enable paid traffic)

@@ -29,10 +29,12 @@ and POSTed to `/api/event` → `analytics_events` table. Server-fired events
 | `entitlement_granted` | Any entitlement granted (Paddle, Wise, manual code) | `api/webhooks/paddle.js` (server) |
 | `refund_completed` | Paddle refund/chargeback processed | `api/webhooks/paddle.js` (server) |
 | `pro_gate_attempted` | Email+code submitted to Pro gate | `app.js` `#pro-gate-form` submit |
-| `pro_gate_unlocked` | Pro gate accepted | `app.js` `#pro-gate-form` submit (success path) |
-| `paid_scenario_started` | A Pro-lab scenario is fetched | `app.js` `renderNextProScenario()` |
+| `pro_gate_unlocked` | Pro gate accepted (entitlement verified) | `app.js` `#pro-gate-form` submit (success path) |
+| `mock_selected` | User picks a mock exam from the mock picker | `app.js` mock picker button click |
+| `paid_scenario_started` | A Pro-lab scenario is fetched (within a mock run) | `app.js` `renderNextProScenario()` |
 | `paid_scenario_completed` | A Pro-lab scenario is graded | `app.js` `checkProAnswer()` |
-| `pro_lab_completed` | The full Pro lab run finishes | `app.js` `finishProLab()` |
+| `mock_run_completed` | A 40-question mock exam finishes (completed or timer expires) | `app.js` `finishProLab()` |
+| `pro_lab_exited` | User exits Pro lab mid-run | `app.js` exit button or nav away |
 | `issue_reported` | Issue form submitted | `app.js` `#issue-form` submit |
 
 Adding a funnel step requires adding its event both here/README and in

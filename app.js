@@ -55,6 +55,8 @@ audit_log: true`}, q:"A maintenance agent can format code, rotate production sec
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => HTML_ESCAPES[char]);
 
 const backend = window.GH600_BACKEND || { enabled: false, apiBase: "/api" };
 const sessionId = localStorage.getItem("gh600lab-session-id") || (crypto.randomUUID?.() || `session-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -75,7 +77,7 @@ async function apiRequest(path, payload) {
       body: JSON.stringify(payload)
     });
     const data = await response.json().catch(() => ({ ok: false, error: "Unexpected server response" }));
-    return response.ok ? data : { ...data, ok: false };
+    return response.ok ? data : { ...data, ok: false, status: response.status };
   } catch (error) {
     console.warn(`GH600 API ${path} unavailable`, error);
     return null;
@@ -154,7 +156,6 @@ let answers = [];
 let locked = false;
 let timer = 0;
 let timerId = null;
-let quizMode = "diagnostic";
 let pendingResult = null;
 
 function shuffle(items) {
@@ -176,7 +177,6 @@ function buildDiagnostic() {
 }
 
 function startQuiz() {
-  quizMode = "diagnostic";
   quizSet = buildDiagnostic();
   quizIndex = 0;
   answers = [];
@@ -215,13 +215,13 @@ function renderQuestion() {
       </aside>
       <div class="question-main">
         <span class="question-kicker">${item.artifact ? "ARTIFACT LAB" : "PRODUCTION SCENARIO"} · CHOOSE ONE</span>
-        ${item.artifact ? `<div class="question-artifact"><div><span>${item.artifact.name}</span><small>INSPECT THIS ARTIFACT</small></div><pre><code>${item.artifact.code}</code></pre></div>` : ""}
-        <h2>${item.q}</h2>
-        <div class="answer-list">${item.a.map((answer, i) => `<button class="answer-option" data-answer="${i}"><span>${String.fromCharCode(65+i)}</span><b>${answer}</b></button>`).join("")}</div>
+        ${item.artifact ? `<div class="question-artifact"><div><span>${escapeHtml(item.artifact.name)}</span><small>INSPECT THIS ARTIFACT</small></div><pre><code>${escapeHtml(item.artifact.code)}</code></pre></div>` : ""}
+        <h2>${escapeHtml(item.q)}</h2>
+        <div class="answer-list">${item.a.map((answer, i) => `<button class="answer-option" data-answer="${i}"><span>${String.fromCharCode(65+i)}</span><b>${escapeHtml(answer)}</b></button>`).join("")}</div>
         <div id="explanation-slot"></div>
         <div class="question-actions"><button class="button button-dark" id="submit-answer" disabled>Check decision <span>→</span></button></div>
       </div>
-      <aside class="objective-panel"><span>BLUEPRINT OBJECTIVE</span><h4>${item.objective}</h4><div class="objective-line" style="--objective:${60 + item.d * 5}%"><i></i></div><p>Original scenario mapped to the public GH-600 skills outline and supporting documentation.</p></aside>
+      <aside class="objective-panel"><span>BLUEPRINT OBJECTIVE</span><h4>${escapeHtml(item.objective)}</h4><div class="objective-line" style="--objective:${60 + item.d * 5}%"><i></i></div><p>Original scenario mapped to the public GH-600 skills outline and supporting documentation.</p></aside>
     </section>`;
 
   $$("[data-answer]", quizBody).forEach(button => button.addEventListener("click", () => {
@@ -252,7 +252,7 @@ function checkAnswer() {
     if (i === item.c) button.classList.add("correct");
     if (i === selected && !correct) button.classList.add("wrong");
   });
-  $("#explanation-slot").innerHTML = `<div class="explanation ${correct ? "correct-exp" : "wrong-exp"}"><strong>${correct ? "Good call." : "Not quite."}</strong><p>${item.why}</p></div>`;
+  $("#explanation-slot").innerHTML = `<div class="explanation ${correct ? "correct-exp" : "wrong-exp"}"><strong>${correct ? "Good call." : "Not quite."}</strong><p>${escapeHtml(item.why)}</p></div>`;
   const action = $("#submit-answer");
   action.disabled = false;
   action.innerHTML = quizIndex === quizSet.length - 1 ? "View readiness report <span>→</span>" : "Next scenario <span>→</span>";
@@ -304,7 +304,6 @@ let proScenarioStartedAt = 0;
 let currentMockId = null;
 
 async function startProLab(mockId) {
-  quizMode = "pro";
   currentMockId = mockId;
   proAnswers = [];
   proAttemptCount = 0;
@@ -326,7 +325,8 @@ async function renderNextProScenario() {
   selected = null;
   const token = localStorage.getItem("gh600lab-session-token") || "";
   const response = await apiRequest("/scenarios/next", { token, session_id: sessionId, mock_id: currentMockId });
-  if (!response?.ok || response.done || !response.scenario) { finishProLab(); return; }
+  if (response?.done) { finishProLab(); return; }
+  if (!response?.ok || !response.scenario) { expireProLab(); return; }
   currentProScenario = response.scenario;
   proScenarioStartedAt = Date.now();
   proAttemptCount++;
@@ -347,13 +347,13 @@ async function renderNextProScenario() {
       </aside>
       <div class="question-main">
         <span class="question-kicker">${artifact ? "ARTIFACT LAB" : "PRODUCTION SCENARIO"} · CHOOSE ONE</span>
-        ${artifact ? `<div class="question-artifact"><div><span>${artifact.name}</span><small>INSPECT THIS ARTIFACT</small></div><pre><code>${artifact.code}</code></pre></div>` : ""}
-        <h2>${currentProScenario.prompt}</h2>
-        <div class="answer-list">${currentProScenario.options.map((answer, i) => `<button class="answer-option" data-answer="${i}"><span>${String.fromCharCode(65 + i)}</span><b>${answer}</b></button>`).join("")}</div>
+        ${artifact ? `<div class="question-artifact"><div><span>${escapeHtml(artifact.name)}</span><small>INSPECT THIS ARTIFACT</small></div><pre><code>${escapeHtml(artifact.code)}</code></pre></div>` : ""}
+        <h2>${escapeHtml(currentProScenario.prompt)}</h2>
+        <div class="answer-list">${currentProScenario.options.map((answer, i) => `<button class="answer-option" data-answer="${i}"><span>${String.fromCharCode(65 + i)}</span><b>${escapeHtml(answer)}</b></button>`).join("")}</div>
         <div id="explanation-slot"></div>
         <div class="question-actions"><button class="button button-dark" id="submit-answer" disabled>Check decision <span>→</span></button></div>
       </div>
-      <aside class="objective-panel"><span>BLUEPRINT OBJECTIVE</span><h4>${currentProScenario.objective}</h4><div class="objective-line" style="--objective:${60 + domain.id * 5}%"><i></i></div><p>Original scenario mapped to the public GH-600 skills outline and supporting documentation.</p></aside>
+      <aside class="objective-panel"><span>BLUEPRINT OBJECTIVE</span><h4>${escapeHtml(currentProScenario.objective)}</h4><div class="objective-line" style="--objective:${60 + domain.id * 5}%"><i></i></div><p>Original scenario mapped to the public GH-600 skills outline and supporting documentation.</p></aside>
     </section>`;
 
   $$("[data-answer]", quizBody).forEach(button => button.addEventListener("click", () => {
@@ -385,12 +385,13 @@ async function checkProAnswer() {
     if (i === correctIndex) button.classList.add("correct");
     if (i === selected && !correct) button.classList.add("wrong");
   });
-  $("#explanation-slot").innerHTML = `<div class="explanation ${correct ? "correct-exp" : "wrong-exp"}"><strong>${correct ? "Good call." : "Not quite."}</strong><p>${response?.explanation || ""}</p></div>`;
+  $("#explanation-slot").innerHTML = `<div class="explanation ${correct ? "correct-exp" : "wrong-exp"}"><strong>${correct ? "Good call." : "Not quite."}</strong><p>${escapeHtml(response?.explanation || "")}</p></div>`;
   trackEvent("paid_scenario_completed", { scenario_id: currentProScenario.id, mock_id: currentMockId, correct });
   action.disabled = false;
   const mockLength = MOCK_LENGTHS[currentMockId] || 40;
-  action.innerHTML = proAttemptCount >= mockLength ? "View readiness report <span>→</span>" : "Next scenario <span>→</span>";
-  action.onclick = () => renderNextProScenario();
+  const mockComplete = proAttemptCount >= mockLength;
+  action.innerHTML = mockComplete ? "View readiness report <span>→</span>" : "Next scenario <span>→</span>";
+  action.onclick = mockComplete ? () => finishProLab() : () => renderNextProScenario();
 }
 
 function finishProLab() {
@@ -407,6 +408,15 @@ function finishProLab() {
   $("#quiz-progress-label").textContent = `${MOCK_LABELS[currentMockId] || "Pro lab"} complete`;
   $("#quiz-progress-bar").style.width = "100%";
   renderDetailedReport(result);
+}
+
+function expireProLab() {
+  clearInterval(timerId);
+  closeQuiz();
+  localStorage.removeItem("gh600lab-session-token");
+  const message = $("#pro-gate-message");
+  if (message) message.textContent = "Your session expired — please re-enter your email and access code.";
+  proGateDialog.showModal();
 }
 
 function renderReportGate(result) {

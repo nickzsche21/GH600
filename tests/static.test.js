@@ -57,3 +57,23 @@ test("pro gate stores a server-issued session token, not a boolean flag", () => 
   assert.doesNotMatch(app, /gh600lab-pro-access["'],\s*"granted"/);
   assert.match(app, /gh600lab-session-token/);
 });
+
+test("diagnostic and Pro-lab rendering escape server/authored content before it hits innerHTML", () => {
+  assert.match(app, /const escapeHtml = /);
+  // Diagnostic path (renderQuestion): prompt, options, artifact name/code, objective, explanation.
+  assert.match(app, /<h2>\$\{escapeHtml\(item\.q\)\}<\/h2>/);
+  assert.match(app, /<b>\$\{escapeHtml\(answer\)\}<\/b>/);
+  assert.match(app, /<span>\$\{escapeHtml\(item\.artifact\.name\)\}<\/span>/);
+  assert.match(app, /<code>\$\{escapeHtml\(item\.artifact\.code\)\}<\/code>/);
+  assert.match(app, /<h4>\$\{escapeHtml\(item\.objective\)\}<\/h4>/);
+  assert.match(app, /<p>\$\{escapeHtml\(item\.why\)\}<\/p>/);
+  // Pro-lab path (renderNextProScenario): same fields off the server scenario object.
+  assert.match(app, /<h2>\$\{escapeHtml\(currentProScenario\.prompt\)\}<\/h2>/);
+  assert.match(app, /<h4>\$\{escapeHtml\(currentProScenario\.objective\)\}<\/h4>/);
+  assert.match(app, /escapeHtml\(response\?\.explanation/);
+});
+
+test("Pro-lab scenario delivery distinguishes an exhausted mock from an expired/invalid session", () => {
+  assert.match(app, /if \(response\?\.done\)/);
+  assert.match(app, /function expireProLab/);
+});

@@ -4,13 +4,15 @@
 
 | Component | Files | Runtime |
 |---|---|---|
-| Marketing site + quiz UI | `index.html`, `styles.css`, `app.js` | Static, served by Vercel (or `python -m http.server` locally) |
+| Marketing site + free diagnostic UI | `index.html`, `styles.css`, `app.js` (hand-authored `questions` array) | Static, served by Vercel (or `python -m http.server` locally); free diagnostic works offline |
 | Client config | `access-config.js`, `backend-config.js`, `checkout-config.js` | Loaded as plain `<script>` tags before `app.js` — see load order note below |
 | API | `api/*.js`, `api/_lib/*.js` | Vercel Edge Functions (plain `export async function POST(request)`, no framework) |
-| Database | `supabase/schema.sql` | Supabase Postgres, accessed only via the service-role key from `api/_lib/supabase.js` |
-| Payments | Paddle (hosted checkout links, Merchant of Record) + Wise (payout + manual invoice) | Provider resolved per plan in `api/_lib/plans.js` / `api/_lib/providers.js`; Paddle confirmed via `api/webhooks/paddle.js`, Wise confirmed manually via `api/admin/grant.js` |
-| Entitlement/session | `api/_lib/entitlements.js`, `api/access/session.js` | Server-issued, revocable, HMAC-enveloped session tokens back the Pro-lab gate — never client-trusted |
-| Paid content | `api/scenarios/*.js`, `scenarios`/`scenario_attempts` tables | The 18 Pro scenarios live server-side; the client never receives the answer key |
+| Database | `supabase/schema.sql` | Supabase Postgres (11 tables, RLS enabled), accessed only via service-role key from `api/_lib/supabase.js` |
+| Payments | Paddle (Founding $29, Pro $49, hosted checkout) + Wise (Team $149, Cram $99, manual) | Provider resolved per plan in `api/_lib/plans.js`; Paddle confirmed via `api/webhooks/paddle.js`, Wise via `api/admin/grant.js` (bearer token) |
+| Entitlement/session | `api/_lib/entitlements.js`, `api/access/session.js`, `api/access/verify.js` | Server-issued, revocable, HMAC-enveloped session tokens (hash-only stored, never raw value persisted); gate revalidated on every Pro-lab entry |
+| Paid content tier structure | `api/_lib/plans.js` (`contentTiers`, `allowedMocks`) | Three tiers: Free (12 diagnostic inline) / Founder $29 (120 questions, MOCK_1–3) / Pro $49 (300 questions, MOCK_1–6 + drills) |
+| Paid content delivery | `api/scenarios/next.js`, `api/scenarios/answer.js`, `api/_lib/scenario-map.js` | 300-scenario premium bank in `gh600_scenarios_v2`; one scenario per call (no answer key), graded server-side, tier-gated per plan |
+| Mock-based runs | `app.js` mock picker, `/api/scenarios/next?mock_id=MOCK_N` | User selects which 40-question mock exam to run; UI shows progress per mock |
 
 ## Load order (`index.html`)
 
@@ -35,17 +37,18 @@ only — production (Vercel + Supabase configured) always has
    `/api/lead` (`api/lead.js`) → inserts into `leads`.
 3. User clicks a paid plan → `checkout_started` fires, then the access
    dialog POSTs to `/api/checkout-intent` (`api/checkout-intent.js`), which
-   resolves the plan and its provider server-side via `api/_lib/plans.js` /
-   `api/_lib/providers.js` (client-sent `amount` is ignored), inserts a
-   `payment_intents` row, and returns a Paddle hosted-checkout
-   `redirect_url` (Founding Access) or `manual_followup: true` (Team/Cram,
-   which route through Wise).
-4a. **Paddle path:** buyer pays on Paddle's hosted page. Paddle calls
-   `POST /api/webhooks/paddle` (`api/webhooks/paddle.js`), which verifies
-   the `Paddle-Signature` HMAC over the raw body before parsing anything,
-   then idempotently records a `purchases` row and calls
-   `grantEntitlement()` (`api/_lib/entitlements.js`). Refund/chargeback
-   events call `revokeEntitlement()`.
+   resolves the plan and its provider server-side via `api/_lib/plans.js`
+   (client-sent `amount` is ignored), inserts a `payment_intents` row, and
+   returns a Paddle hosted-checkout `redirect_url` (Founding Access $29 /
+   Pro $49) or `manual_followup: true` (Team $149 / Cram $99, routed through
+   Wise).
+4a. **Paddle path (Founding/Pro):** buyer pays on Paddle's hosted page.
+   Paddle calls `POST /api/webhooks/paddle` (`api/webhooks/paddle.js`),
+   which verifies the `Paddle-Signature` HMAC over the raw body before
+   parsing anything, resolves the buyer's email server-side (fetches from
+   Paddle API if not in custom_data), then idempotently records a
+   `purchases` row and calls `grantEntitlement()` (`api/_lib/entitlements.js`).
+   Refund/chargeback events call `revokeEntitlement()`.
 4b. **Wise path (Team/Cram):** founder confirms the transfer out-of-band
    and calls `POST /api/admin/grant` (`api/admin/grant.js`, bearer
    `ADMIN_API_TOKEN`), which grants the entitlement directly.
@@ -58,10 +61,20 @@ only — production (Vercel + Supabase configured) always has
 7. `app.js` stores the returned token (`gh600lab-session-token`, not a
    boolean flag) and calls `POST /api/access/session` on every Pro-lab
    entry to re-verify it before opening the dialog.
-8. Inside the lab, `app.js` calls `POST /api/scenarios/next` (returns one
-   scenario, no answer key) and `POST /api/scenarios/answer` (grades
-   server-side, returns the explanation for that scenario only) —
-   see `docs/engineering/data-model.md` for the `scenarios` table shape.
+8. Inside the lab, `app.js` renders a **mock picker** (Founder: MOCK_1–3,
+   Pro: MOCK_1–6 + Drills). Selecting a mock calls `POST /api/scenarios/next`
+   with `mock_id`, which returns one scenario at a time (no answer key,
+   tier-gated via `contentTiers()` in `api/_lib/plans.js`). Each scenario
+   returns via `toClientScenario()` (`api/_lib/scenario-map.js`), which
+   strips the answer key and maps v2 columns to the client contract.
+9. User submits an answer → `POST /api/scenarios/answer` (grades server-side
+   via `gradingFields()`, returns explanation for *that scenario only*).
+   After 40 questions or timer expires, the mock run finishes.
+10. Scenarios never ship in full to the client. The answer key and
+    decision principles stay in `supabase/public.gh600_scenarios_v2` and are
+    only used in `/api/scenarios/answer` for grading — see
+    `docs/engineering/data-model.md` for the v2 table shape and
+    `docs/plans/premium-bank-300.md` for the tier/mock structure.
 
 Every step also fires a named analytics event — see
 `docs/business/revenue-flow.md`.

@@ -84,16 +84,88 @@ test("access gate redeems the code atomically and mints a session token", async 
 test("access gate rejects an exhausted/invalid code and registers the failed attempt", async () => {
   const originalFetch = globalThis.fetch;
   let registeredFailure = false;
-  globalThis.fetch = async url => {
+  let registeredEmail;
+  globalThis.fetch = async (url, options) => {
     const path = pathOf(url);
     if (path.endsWith("/rpc/redeem_access_code")) return Response.json([]);
-    if (path.endsWith("/rpc/register_failed_code")) { registeredFailure = true; return Response.json([]); }
+    if (path.endsWith("/rpc/register_failed_code")) {
+      registeredFailure = true;
+      registeredEmail = JSON.parse(options.body).p_email;
+      return Response.json([]);
+    }
     return Response.json([]);
   };
   try {
     const response = await verifyAccess(request("/api/access/verify", { email: "buyer@example.com", code: "MAXED-OUT" }));
     assert.equal(response.status, 401);
     assert.equal(registeredFailure, true);
+    assert.equal(registeredEmail, "buyer@example.com");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("re-login with the same code+email reissues a session without burning a use or duplicating the entitlement", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    const path = pathOf(url);
+    calls.push({ path, method: options.method });
+    if (path.endsWith("/entitlements") && options.method === "GET") {
+      return Response.json([{ id: "ent-existing", email: "buyer@example.com", plan: "founding_access" }]);
+    }
+    if (path.endsWith("/access_sessions") && options.method === "POST") return Response.json([{ id: "sess-again" }], { status: 201 });
+    return Response.json([]);
+  };
+  try {
+    const response = await verifyAccess(request("/api/access/verify", { email: "buyer@example.com", code: "GH600-REPEAT" }));
+    const body = await response.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.plan, "founding_access");
+    assert.ok(body.token);
+    assert.equal(calls.some(c => c.path.endsWith("/rpc/redeem_access_code")), false);
+    assert.equal(calls.some(c => c.path.endsWith("/entitlements") && c.method === "POST"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("an access code seeded with a plan alias normalizes before granting", async () => {
+  const originalFetch = globalThis.fetch;
+  let insertedEntitlement;
+  globalThis.fetch = async (url, options) => {
+    const path = pathOf(url);
+    if (path.endsWith("/rpc/redeem_access_code")) return Response.json([{ plan: "founder", email: "buyer@example.com" }]);
+    if (path.endsWith("/entitlements") && options.method === "GET") return Response.json([]);
+    if (path.endsWith("/entitlements") && options.method === "POST") {
+      insertedEntitlement = JSON.parse(options.body);
+      return Response.json([{ id: "ent-alias", email: "buyer@example.com", plan: insertedEntitlement.plan }], { status: 201 });
+    }
+    if (path.endsWith("/access_sessions")) return Response.json([{ id: "sess-alias" }], { status: 201 });
+    return Response.json([]);
+  };
+  try {
+    const response = await verifyAccess(request("/api/access/verify", { email: "buyer@example.com", code: "ALIAS-CODE" }));
+    const body = await response.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.plan, "founding_access");
+    assert.equal(insertedEntitlement.plan, "founding_access");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("an access code with an unresolvable plan value is rejected instead of granting an empty-tier entitlement", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    const path = pathOf(url);
+    if (path.endsWith("/rpc/redeem_access_code")) return Response.json([{ plan: "not-a-real-plan", email: "buyer@example.com" }]);
+    if (path.endsWith("/entitlements")) return Response.json([]);
+    return Response.json([]);
+  };
+  try {
+    const response = await verifyAccess(request("/api/access/verify", { email: "buyer@example.com", code: "BOGUS-PLAN" }));
+    assert.equal(response.status, 422);
   } finally {
     globalThis.fetch = originalFetch;
   }

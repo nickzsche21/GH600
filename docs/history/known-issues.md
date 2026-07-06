@@ -66,13 +66,15 @@ Tests (`npm test`) and syntax check (`npm run check`) exist but run only
 locally/manually — there's no GitHub Actions or Vercel build-check wiring
 them in yet. If you add one, keep it proportional to the project's size.
 
-## Code review — paid-lab pass (2026-07-06)
+## Code review — paid-lab pass (2026-07-06) — all 10 findings fixed 2026-07-06/07
 
 High-effort review of the working-tree changes (Paddle/Wise payments,
 entitlements, revocable sessions, server-graded scenarios). Findings are
-ranked by severity and verified against the current files. Several land on
-the revenue flow (payment → entitlement → Pro lab) and contradict the
-"Resolved" section above — treat those as **reopened**, not settled.
+ranked by severity and verified against the current files. Several landed on
+the revenue flow (payment → entitlement → Pro lab) and contradicted the
+"Resolved" section above — those were **reopened**, then fixed per
+`docs/plans/code-review-fixes-2026-07-06.md`. Status per finding below;
+kept for history (each finding is what the review found *before* the fix).
 
 ### Revenue-critical (fix before any paid traffic)
 
@@ -188,3 +190,51 @@ Refuted during review: the concern that `scripts/seed-scenarios.js` seeds a
 table the API never reads — `scripts/seed-scenarios-v2.js` is the correct
 current seeder and writes to `gh600_scenarios_v2`. The legacy
 `seed-scenarios.js` remains a footgun only if run manually.
+
+### Fix status (2026-07-06/07) — all 10 findings resolved
+
+Per `docs/plans/code-review-fixes-2026-07-06.md`, verified via `npm test`
+(54 tests) plus manual Paddle-sandbox/`vercel dev` checks:
+
+1. **Paddle buyer email** — `api/webhooks/paddle.js` `resolvePaddleEmail()`
+   now falls back to `GET /customers/:id` on the Paddle API when
+   `custom_data.email` is absent; unresolved payments log a
+   `payment_unresolved` analytics event instead of silently dropping.
+2. **Re-login lockout** — `api/access/verify.js` computes a per-buyer
+   `reference = code:CODE:email`; `findActiveEntitlement()`
+   (`api/_lib/entitlements.js`) reissues a session from an existing active
+   entitlement without calling `redeemAccessCode` again (no `use` burned).
+3. **Partial refund revokes Pro** — `isFullRefund()` in
+   `api/webhooks/paddle.js` requires `data.action === 'refund'` **and** the
+   refunded total to match the purchase amount before revoking;
+   `transaction.refunded` still always revokes.
+4. **Plan alias yields empty lab** — `verify.js` calls `resolvePlan()` on
+   the redeemed code's plan before granting (422 if unresolvable), so
+   `contentTiers`/`allowedMocks` never silently fall through to `[]`.
+5. **Bogus "complete, score 0"** — `app.js` `renderNextProScenario` now
+   branches `response.done` (real completion) from an error/expired
+   response (`expireProLab()` re-opens the Pro gate with a message instead).
+6. **Stored XSS** — `escapeHtml()` wraps every DB/authored string
+   interpolated into `innerHTML` in both `renderQuestion` (diagnostic) and
+   `renderNextProScenario` (Pro).
+7. **Griefable lockout** — the 5-strikes/15-min lock moved from
+   `access_codes` (whole-code) to a new `access_code_attempts` table keyed
+   on `(code, email)`; `redeem_access_code` clears the caller's row on
+   success. See `supabase/migrations/20260706185145_fix_access_code_lockout_identity.sql`.
+8. **Cosmetic mock cap** — `checkProAnswer`'s terminal button now wires
+   `onclick` to `finishProLab` (not `renderNextProScenario`) once
+   `proAttemptCount >= mockLength`.
+9. **5s replay window** — widened to Paddle's own guidance,
+   `REPLAY_TOLERANCE_MS = 5 * 60 * 1000`.
+10. **Email normalization** — folded into fix #1 (`resolvePaddleEmail`
+    returns `normalizeEmail()`'s output on both the `custom_data` and
+    customer-API paths).
+
+Cleanup also done: PostgREST `not.in.()` list values are quoted
+(`api/scenarios/next.js`); `sha256Hex`/`timingSafeEqualHex`/HMAC helpers
+consolidated into `api/_lib/crypto.js`; the unreachable `providers.js`
+`manual` registry entry, the write-only `quizMode` variable, and the no-op
+`backend-config.js` ternary were removed. The Pro-lab-is-a-fork-of-the-quiz-engine
+observation (cleanup item, not a finding) was left as-is per the plan's own
+guidance — it's an optional larger refactor, not required this pass, and
+both copies now share the same escaping fix.

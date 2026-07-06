@@ -1,27 +1,17 @@
-import { json } from "../_lib/http.js";
+import { json, normalizeEmail } from "../_lib/http.js";
 import { insert, select } from "../_lib/supabase.js";
 import { resolvePlanByPriceId } from "../_lib/plans.js";
 import { grantEntitlement, recordPurchase, revokeEntitlement } from "../_lib/entitlements.js";
+import { hmacHex, timingSafeEqualHex } from "../_lib/crypto.js";
 
-const REPLAY_TOLERANCE_MS = 5000;
+// Paddle's own guidance: reject signatures older than ~5 minutes (not 5
+// seconds — clock skew and Edge cold starts can easily exceed a few seconds).
+const REPLAY_TOLERANCE_MS = 5 * 60 * 1000;
 const REFUND_EVENTS = new Set(["transaction.refunded", "adjustment.created"]);
 
 function parseSignatureHeader(header) {
   const parts = Object.fromEntries(String(header || "").split(";").map(part => part.split("=")));
   return { ts: parts.ts, h1: parts.h1 };
-}
-
-function timingSafeEqualHex(a, b) {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-async function hmacSha256Hex(secret, message) {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
-  return [...new Uint8Array(signature)].map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
 async function verifySignature(request, rawBody) {
@@ -30,7 +20,7 @@ async function verifySignature(request, rawBody) {
   const { ts, h1 } = parseSignatureHeader(request.headers.get("paddle-signature"));
   if (!ts || !h1) return false;
   if (Math.abs(Date.now() - Number(ts) * 1000) > REPLAY_TOLERANCE_MS) return false;
-  const expected = await hmacSha256Hex(secret, `${ts}:${rawBody}`);
+  const expected = await hmacHex(secret, `${ts}:${rawBody}`);
   return timingSafeEqualHex(expected, h1);
 }
 
@@ -41,6 +31,42 @@ async function logAnalyticsEvent(eventName, email, metadata) {
     event_name: eventName,
     metadata: metadata || {}
   }).catch(() => {});
+}
+
+async function resolvePaddleEmail(data) {
+  const direct = data.custom_data?.email;
+  if (direct) return normalizeEmail(direct);
+  const customerId = data.customer_id;
+  const apiKey = process.env.PADDLE_API_KEY;
+  if (!customerId || !apiKey) return "";
+  const host = process.env.PADDLE_ENV === "sandbox" ? "api.sandbox.paddle.com" : "api.paddle.com";
+  try {
+    const response = await fetch(`https://${host}/customers/${customerId}`, {
+      headers: { authorization: `Bearer ${apiKey}` }
+    });
+    if (!response.ok) return "";
+    const body = await response.json();
+    return normalizeEmail(body?.data?.email || "");
+  } catch {
+    return "";
+  }
+}
+
+function paddleAmountToUnits(rawValue) {
+  const numeric = Number(rawValue);
+  return Number.isFinite(numeric) ? numeric / 100 : null;
+}
+
+// Paddle emits `adjustment.created` for partial refunds, credits, and tax
+// adjustments too — only a full refund should ever revoke access.
+function isFullRefund(eventType, data, purchase) {
+  if (eventType === "transaction.refunded") return true;
+  if (eventType === "adjustment.created" && data.action === "refund") {
+    const refundedUnits = paddleAmountToUnits(data.totals?.total ?? data.total ?? data.amount);
+    if (refundedUnits === null) return false; // amount ambiguous -> don't revoke
+    return Math.abs(refundedUnits - purchase.amount) < 0.01;
+  }
+  return false;
 }
 
 export async function POST(request) {
@@ -61,7 +87,7 @@ export async function POST(request) {
   if (eventType === "transaction.completed") {
     const priceId = data.items?.[0]?.price?.id;
     const plan = resolvePlanByPriceId(priceId);
-    const email = (data.custom_data?.email || "").toLowerCase();
+    const email = await resolvePaddleEmail(data);
     if (plan && email) {
       const purchase = await recordPurchase({
         email,
@@ -81,17 +107,23 @@ export async function POST(request) {
       });
       await logAnalyticsEvent("payment_succeeded", email, { plan: plan.id, provider: "paddle" });
       await logAnalyticsEvent("entitlement_granted", email, { plan: plan.id, entitlement_id: entitlement.id });
+    } else {
+      await logAnalyticsEvent("payment_unresolved", email || null, { price_id: priceId || null, provider_payment_id: data.id || null });
     }
   } else if (REFUND_EVENTS.has(eventType)) {
     const providerPaymentId = data.transaction_id || data.id;
     const purchases = await select("purchases", { provider: "eq.paddle", provider_payment_id: `eq.${providerPaymentId}`, limit: "1" });
     const purchase = purchases[0];
     if (purchase) {
-      const entitlements = await select("entitlements", { source_purchase_id: `eq.${purchase.id}`, limit: "1" });
-      const entitlement = entitlements[0];
-      if (entitlement) {
-        await revokeEntitlement({ entitlement_id: entitlement.id, reason: eventType });
-        await logAnalyticsEvent("refund_completed", purchase.email, { plan: purchase.plan, provider: "paddle" });
+      if (isFullRefund(eventType, data, purchase)) {
+        const entitlements = await select("entitlements", { source_purchase_id: `eq.${purchase.id}`, limit: "1" });
+        const entitlement = entitlements[0];
+        if (entitlement) {
+          await revokeEntitlement({ entitlement_id: entitlement.id, reason: eventType });
+          await logAnalyticsEvent("refund_completed", purchase.email, { plan: purchase.plan, provider: "paddle" });
+        }
+      } else {
+        await logAnalyticsEvent("partial_refund", purchase.email, { plan: purchase.plan, provider: "paddle", event_type: eventType });
       }
     }
   }

@@ -11,15 +11,10 @@ const providers = {
     createCheckout() {
       return { manual: true };
     }
-  },
-  manual: {
-    createCheckout() {
-      return { manual: true };
-    }
   }
 };
 
 export function createCheckout(plan) {
-  const provider = providers[plan.provider] || providers.manual;
-  return provider.createCheckout(plan);
+  const provider = providers[plan.provider];
+  return provider ? provider.createCheckout(plan) : { manual: true };
 }

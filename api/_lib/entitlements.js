@@ -1,5 +1,6 @@
 import { HttpError } from "./http.js";
 import { insert, select, update, rpc } from "./supabase.js";
+import { hmacSignBase64Url, hmacVerifyBase64Url, randomOpaqueId, sha256Hex } from "./crypto.js";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -7,45 +8,6 @@ function signingSecret() {
   const secret = process.env.ENTITLEMENT_SIGNING_SECRET;
   if (!secret) throw new HttpError(503, "Entitlement signing is not configured");
   return secret;
-}
-
-function bytesToBase64Url(bytes) {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function base64UrlToBytes(value) {
-  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(value.length + ((4 - (value.length % 4)) % 4), "=");
-  const binary = atob(padded);
-  return Uint8Array.from(binary, char => char.charCodeAt(0));
-}
-
-async function importHmacKey(secret) {
-  return crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
-}
-
-async function hmacSign(message, secret) {
-  const key = await importHmacKey(secret);
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
-  return bytesToBase64Url(new Uint8Array(signature));
-}
-
-async function hmacVerify(message, signatureB64Url, secret) {
-  const key = await importHmacKey(secret);
-  const signature = base64UrlToBytes(signatureB64Url);
-  return crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(message));
-}
-
-async function sha256Hex(message) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(message));
-  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
-}
-
-function randomOpaqueId() {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return bytesToBase64Url(bytes);
 }
 
 export async function recordPurchase({ email, provider, provider_payment_id, provider_order_id, plan, amount, currency, metadata }) {
@@ -63,6 +25,16 @@ export async function recordPurchase({ email, provider, provider_payment_id, pro
     metadata: metadata || {}
   });
   return purchase;
+}
+
+export async function findActiveEntitlement({ email, reference }) {
+  const rows = await select("entitlements", {
+    email: `eq.${email}`,
+    active: "eq.true",
+    "metadata->>reference": `eq.${reference}`,
+    limit: "1"
+  });
+  return rows[0] || null;
 }
 
 export async function grantEntitlement({ email, plan, source, source_purchase_id, granted_by, expires_at, reference }) {
@@ -104,7 +76,7 @@ export async function issueSession(entitlement) {
     token_hash: tokenHash,
     expires_at: expiresAt
   });
-  const signature = await hmacSign(sessionId, secret);
+  const signature = await hmacSignBase64Url(sessionId, secret);
   return { token: `${sessionId}.${signature}`, expires_at: expiresAt };
 }
 
@@ -115,7 +87,7 @@ export async function verifySession(rawToken) {
   if (separatorIndex < 1) return null;
   const sessionId = value.slice(0, separatorIndex);
   const signature = value.slice(separatorIndex + 1);
-  const validSignature = await hmacVerify(sessionId, signature, secret).catch(() => false);
+  const validSignature = await hmacVerifyBase64Url(sessionId, signature, secret).catch(() => false);
   if (!validSignature) return null;
   const tokenHash = await sha256Hex(sessionId);
   const rows = await select("access_sessions", { token_hash: `eq.${tokenHash}`, revoked: "eq.false", limit: "1" });
@@ -131,6 +103,6 @@ export async function redeemAccessCode(code, email) {
   return rows[0] || null;
 }
 
-export function registerFailedCode(code) {
-  return rpc("register_failed_code", { p_code: code });
+export function registerFailedCode(code, email) {
+  return rpc("register_failed_code", { p_code: code, p_email: email });
 }

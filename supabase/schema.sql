@@ -98,8 +98,21 @@ alter table public.issue_reports enable row level security;
 alter table public.payment_intents add column if not exists purchase_id uuid;
 alter table public.payment_intents alter column provider set default 'razorpay';
 
-alter table public.access_codes add column if not exists failed_attempts integer not null default 0;
-alter table public.access_codes add column if not exists locked_until timestamptz;
+-- failed_attempts/locked_until on access_codes itself locked the *whole
+-- code* out for every buyer on 5 wrong-email attempts (griefable). Superseded
+-- by the per-(code, email) public.access_code_attempts table below.
+alter table public.access_codes drop column if exists failed_attempts;
+alter table public.access_codes drop column if exists locked_until;
+
+create table if not exists public.access_code_attempts (
+  code text not null,
+  email text not null,
+  failed_attempts integer not null default 0,
+  locked_until timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (code, email)
+);
+alter table public.access_code_attempts enable row level security;
 
 create table if not exists public.purchases (
   id uuid primary key default gen_random_uuid(),
@@ -196,9 +209,17 @@ alter table public.scenario_attempts enable row level security;
 
 -- RPCs: SECURITY DEFINER so the service role can perform atomic, race-free
 -- code redemption and lockout bookkeeping in a single statement.
+--
+-- NOTE: the lockout identity moved to public.access_code_attempts (below,
+-- keyed on (code, email)) so five wrong-*email* attempts against a shared
+-- code can no longer lock out the correct buyer. See
+-- docs/history/known-issues.md "code review — paid-lab pass" finding #7.
 
 create or replace function public.redeem_access_code(p_code text, p_email text)
 returns table (plan text, email text) as $$
+declare
+  v_plan text;
+begin
   update public.access_codes
   set uses = uses + 1, last_used_at = now()
   where code = p_code
@@ -206,16 +227,30 @@ returns table (plan text, email text) as $$
     and (email = '*' or lower(email) = lower(p_email))
     and (max_uses is null or uses < max_uses)
     and (expires_at is null or expires_at > now())
-    and (locked_until is null or locked_until < now())
-  returning access_codes.plan, p_email as email;
-$$ language sql security definer set search_path = public;
+    and not exists (
+      select 1 from public.access_code_attempts a
+      where a.code = p_code and a.email = lower(p_email)
+        and a.locked_until is not null and a.locked_until > now()
+    )
+  returning access_codes.plan into v_plan;
 
-create or replace function public.register_failed_code(p_code text)
+  if v_plan is not null then
+    delete from public.access_code_attempts where code = p_code and email = lower(p_email);
+    return query select v_plan, p_email;
+  end if;
+  return;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create or replace function public.register_failed_code(p_code text, p_email text)
 returns void as $$
-  update public.access_codes
-  set failed_attempts = failed_attempts + 1,
-      locked_until = case when failed_attempts + 1 >= 5 then now() + interval '15 min' else locked_until end
-  where code = p_code;
+  insert into public.access_code_attempts (code, email, failed_attempts, locked_until, updated_at)
+  values (p_code, lower(p_email), 1, null, now())
+  on conflict (code, email) do update
+  set failed_attempts = public.access_code_attempts.failed_attempts + 1,
+      locked_until = case when public.access_code_attempts.failed_attempts + 1 >= 5
+                          then now() + interval '15 min' else public.access_code_attempts.locked_until end,
+      updated_at = now();
 $$ language sql security definer set search_path = public;
 
 -- ---------------------------------------------------------------------------
