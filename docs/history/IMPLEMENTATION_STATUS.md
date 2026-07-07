@@ -107,7 +107,7 @@ A **paid-ready, revenue-generating MVP** combining:
 **See `docs/history/known-issues.md` "Fix status" for the detailed before/after per finding.**
 
 ### Remaining Operational
-- [ ] Privacy/terms/refund pages (open)
+- [x] Privacy/terms/refund pages live in the repository
 - [ ] Rate limiting (bot controls, open)
 - [ ] 300-scenario SME editorial review (currently `needs_sme_review`, accepted risk)
 
@@ -259,7 +259,7 @@ A **paid-ready, revenue-generating MVP** combining:
 - [ ] SME review of 300 scenarios (`review_status` checks)
 - [ ] All 10 code-review findings fixed + tested
 - [ ] Secrets rotated (Supabase, Paddle, tokens) in production
-- [ ] Privacy/terms/refund pages live
+- [x] Privacy/terms/refund pages live
 - [ ] Rate limiting in place
 
 ---
@@ -331,7 +331,7 @@ A **paid-ready, revenue-generating MVP** combining:
 
 ## Known Gaps (see `docs/history/known-issues.md`)
 
-- Privacy, terms, refund pages (open)
+- Legal routes complete: privacy, terms, and refunds
 - Rate limiting / bot controls (open)
 - 300-scenario editorial review (deliberate: serving as `needs_sme_review`)
 - Longer-term: Paddle API checkout (vs. hosted link)

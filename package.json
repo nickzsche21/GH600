@@ -8,6 +8,6 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check": "node --check app.js"
+    "check": "node --check app.js && node --check diagnostic-utils.js"
   }
 }

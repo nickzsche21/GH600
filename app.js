@@ -1,3 +1,5 @@
+import { buildBalancedDiagnostic } from "./diagnostic-utils.js";
+
 const domains = [
   { id: 1, short: "Architecture", name: "Architecture & SDLC", weight: "15–20%", color: "#94b5ff", desc: "Success criteria, planning boundaries, inspectable artifacts and human intervention." },
   { id: 2, short: "Tool use", name: "Tool Use & Environment", weight: "20–25%", color: "#c8ff47", desc: "MCP configuration, permissions, execution contexts, retries, rollback and escalation." },
@@ -158,22 +160,9 @@ let timer = 0;
 let timerId = null;
 let pendingResult = null;
 
-function shuffle(items) {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
 function buildDiagnostic() {
-  return domains.flatMap(domain => {
-    const pool = questions.filter(q => q.d === domain.id);
-    const artifactQuestion = pool.find(q => q.artifact);
-    const second = shuffle(pool.filter(q => q !== artifactQuestion))[0];
-    return shuffle([artifactQuestion, second]);
-  });
+  const authoredQuestions = questions.map((question, index) => ({ ...question, scenarioId: `gh600-${index + 1}` }));
+  return buildBalancedDiagnostic(domains, authoredQuestions);
 }
 
 function startQuiz() {
@@ -240,7 +229,7 @@ function checkAnswer() {
   const item = quizSet[quizIndex];
   const correct = selected === item.c;
   answers.push({
-    scenario_id: `gh600-${questions.indexOf(item) + 1}`,
+    scenario_id: item.scenarioId,
     domain: item.d,
     objective: item.objective,
     selected_answer: selected,

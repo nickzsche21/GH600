@@ -8,21 +8,25 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260707.1">
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>
   <header class="site-header">
     <a class="brand" href="#top" aria-label="GH600 Lab home">
       <span class="brand-mark">G6</span>
-      <span>GH600 <b>Lab</b></span>
+      <span class="brand-copy"><span>GH600 <b>Lab</b></span><small>Artifact-first exam readiness</small></span>
     </a>
     <nav aria-label="Primary navigation">
       <a href="#method">Method</a>
       <a href="#domains">Domains</a>
       <a href="#pricing">Pricing</a>
     </nav>
-    <button class="button button-small button-ghost" data-open-pro>Pro access <span>↗</span></button>
+    <div class="header-actions">
+      <span class="header-proof"><i></i>300 original scenarios · 6 domains</span>
+      <button class="button button-small button-ghost header-pro" data-open-pro>Member access <span>↗</span></button>
+      <button class="button button-small mobile-header-cta" data-start-quiz>Free diagnostic <span>→</span></button>
+    </div>
   </header>
   <div class="compliance-banner">
     <strong>Original GH-600 practice lab.</strong> Public-doc based scenarios. No dumps. No memorization traps.
@@ -39,7 +43,7 @@
           <button class="button button-dark" data-open-access data-plan="founder">Get founding access — $29</button>
         </div>
         <div class="proof-row" aria-label="Product highlights">
-          <div><strong>18</strong><span>original scenarios live</span></div>
+          <div><strong>300</strong><span>original scenarios</span></div>
           <div><strong>6/6</strong><span>exam domains</span></div>
           <div><strong>0</strong><span>real exam questions</span></div>
         </div>
@@ -235,7 +239,7 @@ approval_required: false</code></pre>
         </article>
       </div>
       <div class="cram-offer"><div><span>NEED IT FAST?</span><b>Urgent GH-600 cram call · 60 minutes · $99</b><p>Limited manual sessions for early candidates.</p></div><button class="button button-outline-light" data-open-access data-plan="cram">Request a slot</button></div>
-      <p class="refund-note">Founder refund policy: request a refund within 7 days if you have completed fewer than 25% of paid scenarios.</p>
+      <p class="refund-note">Seven-day goodwill policy when fewer than 25% of paid scenarios have been answered. <a href="refunds/">Read the full refund policy.</a></p>
       <p class="disclaimer">GH600 Lab is an independent, unofficial practice product and is not affiliated with GitHub, Microsoft, Pearson VUE, or the official GH-600 exam. All scenarios are original and based on public objectives and documentation. No recalled or unauthorized exam content is included.</p>
     </section>
 
@@ -246,9 +250,9 @@ approval_required: false</code></pre>
   </main>
 
   <footer class="site-footer page-shell">
-    <a class="brand" href="#top"><span class="brand-mark">G6</span><span>GH600 <b>Lab</b></span></a>
+    <a class="brand" href="#top"><span class="brand-mark">G6</span><span class="brand-copy"><span>GH600 <b>Lab</b></span><small>Artifact-first exam readiness</small></span></a>
     <p>GH600 Lab is an independent, unofficial practice product and is not affiliated with GitHub, Microsoft, Pearson VUE, or the official GH-600 exam. All scenarios are original and based on public objectives and documentation. No recalled or unauthorized exam content is included.</p>
-    <div><a href="https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/gh-600" target="_blank" rel="noreferrer">Official blueprint ↗</a><a href="#pricing">Pricing</a><button class="footer-button" data-open-pro>Pro access</button><button class="footer-button" data-open-issue>Report an issue</button></div>
+    <div><a href="https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/gh-600" target="_blank" rel="noreferrer">Official blueprint ↗</a><a href="#pricing">Pricing</a><a href="terms/">Terms</a><a href="privacy/">Privacy</a><a href="refunds/">Refunds</a><button class="footer-button" data-open-pro>Member access</button><button class="footer-button" data-open-issue>Report an issue</button></div>
   </footer>
 
   <dialog class="quiz-shell" id="quiz-dialog">
@@ -329,6 +333,6 @@ approval_required: false</code></pre>
   <script src="backend-config.js"></script>
   <script src="checkout-config.js"></script>
   <script src="access-config.js"></script>
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
