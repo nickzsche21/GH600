@@ -83,7 +83,7 @@ curl -X POST https://<your-domain>/api/admin/grant \
 1. Set the Supabase, Paddle, and admin/signing-secret variables in Vercel and run the end-to-end checks above, including a Paddle sandbox purchase.
 2. Remove or rotate any test access codes created in Supabase.
 3. The 300-scenario premium bank ships as `needs_sme_review` (structurally validated, not yet editorially approved) — a deliberate, accepted risk. Have a GH-600 subject-matter expert review it and flip a bad row's `review_status` to `'rejected'` to pull it from delivery immediately (no deploy needed).
-4. Add privacy, terms, refund, and contact pages (still open — see `docs/history/known-issues.md`).
+4. Privacy, terms, and refund routes are included; configure `support@gh600lab.com` routing before launch.
 5. Add rate limiting / bot controls beyond the per-code lockout already in place (still open).
 
 ## Analytics events

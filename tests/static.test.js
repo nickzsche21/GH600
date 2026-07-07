@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const html = readFileSync(resolve(root, "index.html"), "utf8");
 const app = readFileSync(resolve(root, "app.js"), "utf8");
+const diagnosticUtils = readFileSync(resolve(root, "diagnostic-utils.js"), "utf8");
 
 test("all local page assets exist", () => {
   const assets = [...html.matchAll(/(?:src|href)="([^"#?]+)"/g)]
@@ -19,6 +20,27 @@ test("backend config loads before the application", () => {
   assert.ok(html.indexOf('src="backend-config.js"') < html.indexOf('src="app.js"'));
 });
 
+test("legal pages are linked from the public site and exist", () => {
+  for (const route of ["terms", "privacy", "refunds"]) {
+    assert.match(html, new RegExp(`href="${route}\\/"`));
+    assert.equal(existsSync(resolve(root, route, "index.html")), true, `${route}/index.html should exist`);
+  }
+});
+
+test("header exposes factual product proof and a mobile diagnostic CTA", () => {
+  assert.match(html, /300 original scenarios · 6 domains/);
+  assert.match(html, /mobile-header-cta[^>]*data-start-quiz/);
+  assert.doesNotMatch(html, /18<\/strong><span>original scenarios live/);
+});
+
+test("diagnostic answer positions are balanced instead of inheriting authored B-heavy indexes", () => {
+  assert.match(app, /buildBalancedDiagnostic\(domains, authoredQuestions\)/);
+  assert.match(diagnosticUtils, /\[0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3\]/);
+  assert.match(app, /scenarioId: `gh600-\$\{index \+ 1\}`/);
+  assert.match(app, /scenario_id: item\.scenarioId/);
+  assert.doesNotMatch(app, /questions\.indexOf\(item\)/);
+});
+
 test("front end calls every revenue endpoint", () => {
   for (const route of ["/lead", "/event", "/diagnostic/complete", "/checkout-intent", "/access/verify", "/access/session", "/issue-report"]) {
     assert.match(app, new RegExp(route.replaceAll("/", "\\/")));
@@ -26,14 +48,14 @@ test("front end calls every revenue endpoint", () => {
 });
 
 test("server credential name is absent from browser assets", () => {
-  const publicBundle = ["index.html", "app.js", "backend-config.js", "checkout-config.js", "access-config.js"]
+  const publicBundle = ["index.html", "app.js", "diagnostic-utils.js", "backend-config.js", "checkout-config.js", "access-config.js"]
     .map(file => readFileSync(resolve(root, file), "utf8"))
     .join("\n");
   assert.doesNotMatch(publicBundle, /SUPABASE_SERVICE_ROLE_KEY/);
 });
 
 test("no secret-shaped values leak into browser assets", () => {
-  const publicBundle = ["index.html", "app.js", "backend-config.js", "checkout-config.js", "access-config.js"]
+  const publicBundle = ["index.html", "app.js", "diagnostic-utils.js", "backend-config.js", "checkout-config.js", "access-config.js"]
     .map(file => readFileSync(resolve(root, file), "utf8"))
     .join("\n");
   const secretShapes = [

@@ -55,7 +55,7 @@ rule 6).
 
 Founder-approved deferrals from the Paddle/Wise pass — see the plan's
 "Deferred to a follow-up pass" section: automated transactional email,
-legal pages (Privacy/Terms/Refund/support), rate limiting / bot controls
+rate limiting / bot controls. Privacy, Terms, and Refund routes are now implemented; support is available through the published email and issue form.
 beyond per-code lockout, CORS allowlist + security headers, PostgREST
 filter URL-encoding, and monitoring/error alerts. Per the PRD's go/no-go
 gate, public paid traffic should not open until these land.

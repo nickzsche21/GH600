@@ -1,5 +1,13 @@
 # Latest Changes — 2026-07-07
 
+## Mobile trust, legal routes, and diagnostic balance
+
+- Rebuilt the mobile header around a visible free-diagnostic CTA, factual proof (`300 original scenarios · 6 domains`), and a clearer artifact-first brand line.
+- Added Cloudflare-friendly `/terms/`, `/privacy/`, and `/refunds/` routes and linked them from the main footer and pricing refund note.
+- Added `diagnostic-utils.js`; every 12-question run now contains exactly three correct answers in each A/B/C/D position while preserving two questions per domain.
+- Added regression coverage for answer balancing, option integrity, legal routes, and the mobile-header trust elements.
+- Verification: **59 tests passing** plus syntax checks for `app.js` and `diagnostic-utils.js`.
+
 ## Summary
 
 **Status: Phase 1 (Core MVP) + Phase 2 (Code-Review Fixes) COMPLETE ✅**
@@ -175,7 +183,7 @@ All 10 code-review findings from the 2026-07-06 paid-lab review have been fixed,
 - [ ] Refund workflow
 
 ### ⏳ Pre-Go-Live Operational Work
-- [ ] Privacy, terms, refund, contact pages
+- [x] Privacy, terms, and refund pages; contact is available through support email and the issue form
 - [ ] Rate limiting / bot controls
 - [ ] Error alerting + monitoring
 - [ ] Secret rotation (Supabase, Paddle, tokens)
@@ -232,7 +240,7 @@ All 10 code-review findings from the 2026-07-06 paid-lab review have been fixed,
    - Mark bad ones `review_status='rejected'`
 
 4. **Operationalize** (before go-live)
-   - Add legal pages
+   - Keep legal pages and payment-provider wording current
    - Add rate limiting
    - Set up monitoring
    - Rotate secrets to live mode
