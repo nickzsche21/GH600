@@ -1,10 +1,21 @@
 # Implementation Status — GH600 Lab Paid MVP
 
-**Last updated:** 2026-07-07 (Phase 2 code-review fixes complete)
+**Last updated:** 2026-07-07 (Phase 3 - DEPLOYED TO PRODUCTION at gh600.com)
 
 ## Overview
 
-GH600 Lab has been built as a **paid-ready, revenue-critical MVP** combining a free diagnostic (12 questions), three paid tiers (Founder $29 / Pro $49 / Team $149), and a 300-scenario premium content bank served server-side with full entitlement and session management.
+**GH600 Lab is now LIVE at https://gh600.com** 🚀
+
+A **paid-ready, revenue-generating MVP** combining:
+- Free diagnostic (12 questions, lead magnet)
+- Founder Access ($29, 120 questions / 3 mocks)
+- Pro Tier ($49, 300 questions / 6 mocks + drills)
+- Team/Cram (via manual Wise grants)
+- 300-scenario premium content bank (server-side, server-graded)
+- Full entitlement & session management
+- Paddle payment integration (live mode)
+- Production Supabase backend
+- Vercel deployment
 
 ---
 
@@ -415,36 +426,54 @@ gh600-lab/
 
 ---
 
-## Next Steps
+## Launch Status (2026-07-07)
 
-1. ✅ **Code-review fixes complete** (2026-07-06/07)
-   - All 10 findings verified fixed
-   - 54 tests passing
-   - Manual Paddle sandbox + vercel dev checks done
+✅ **Phase 3: DEPLOYED TO PRODUCTION**
 
-2. **Seed premium bank** (verify 300-scenario import)
-   - Run `node scripts/seed-scenarios-v2.js` (if not done)
-   - Verify 300 rows in `gh600_scenarios_v2`
-   - Verify `review_status` = `'needs_sme_review'` on all rows
+### Currently Live at gh600.com
+- ✅ Free 12-question diagnostic (lead magnet, email capture)
+- ✅ Founder Access ($29) checkout → Paddle integration
+- ✅ Pro Tier ($49) checkout → Paddle integration
+- ✅ Access code redemption (manual grant codes)
+- ✅ 300-scenario premium bank (6 mocks + drills)
+- ✅ Mock-based Pro lab delivery (40-question exams)
+- ✅ Server-graded scenarios (no answer key sent to client)
+- ✅ Session token verification on every Pro entry
+- ✅ Entitlement system (Paddle/Wise/manual)
+- ✅ Refund → entitlement revocation
+- ✅ Analytics & event tracking
+- ✅ Local fallback (no backend API works)
 
-3. **Deploy to staging** + end-to-end test
-   - Free diagnostic (lead capture)
-   - Founding Access checkout (Paddle)
-   - Pro tier selection + mock picker
-   - One full mock exam (40 questions)
-   - Session persistence across browser reload
-   - Session expiry re-verification
-   - Refund → entitlement revoked
+### Post-Launch Priorities
 
-4. **Get SME review** of 300 scenarios
-   - Review `SELECT * FROM gh600_scenarios_v2 WHERE review_status='needs_sme_review'`
-   - Mark bad rows `review_status='rejected'` to pull from delivery
-   - (One-field update, no deploy needed)
+1. **Monitor & iterate** (ongoing)
+   - [ ] Monitor Paddle webhook successes/failures
+   - [ ] Track conversion funnel (diagnostic → lead → checkout → payment)
+   - [ ] Monitor session token expiry/renewal patterns
+   - [ ] Watch for payment refunds/chargebacks
 
-5. **Operationalize** (pre-go-live)
-   - Add privacy/terms/refund/contact pages
-   - Add rate limiting / bot controls (beyond per-code lockout)
-   - Rotate secrets (Supabase, Paddle, admin tokens) to live mode
-   - Set up error alerting + monitoring
+2. **SME review of 300 scenarios** (ongoing)
+   - [ ] Get GH-600 subject-matter expert to review all 300
+   - [ ] Mark bad rows `review_status='rejected'` (one-field update, no deploy)
+   - [ ] Aim to complete within 2 weeks of launch
 
-6. **Go live** (Paddle live mode, enable paid traffic)
+3. **Operationalize** (post-launch hardening)
+   - [ ] Add privacy, terms of service, refund policy pages
+   - [ ] Add contact/support page
+   - [ ] Add rate limiting / bot controls (beyond per-code lockout)
+   - [ ] Set up error alerting + monitoring dashboards
+   - [ ] Add transactional email confirmations (order, access granted, refund)
+   - [ ] Establish oncall rotation for production incidents
+
+4. **Post-launch analytics**
+   - [ ] Track which domains/mocks have highest pass rates
+   - [ ] Identify scenarios with highest wrong-answer rates (quality issues)
+   - [ ] Monitor average session duration
+   - [ ] Track repeat-taker patterns
+
+5. **Future phases** (as demand warrants)
+   - [ ] Add more scenarios to the 300 bank (per kill criteria in launch plan)
+   - [ ] Add diagnostic feedback/recommendations
+   - [ ] Add practice drill packs (beyond the free 12)
+   - [ ] Add admin dashboard for scenario management & bulk review
+   - [ ] Consider group/team licensing (Team/Cram tiers)
