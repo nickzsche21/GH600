@@ -96,7 +96,7 @@ GH600 Lab has been built as a **paid-ready, revenue-critical MVP** combining a f
 **See `docs/history/known-issues.md` "Fix status" for the detailed before/after per finding.**
 
 ### Remaining Operational
-- [ ] Privacy/terms/refund pages (open)
+- [x] Privacy/terms/refund pages live in the repository
 - [ ] Rate limiting (bot controls, open)
 - [ ] 300-scenario SME editorial review (currently `needs_sme_review`, accepted risk)
 
@@ -248,7 +248,7 @@ GH600 Lab has been built as a **paid-ready, revenue-critical MVP** combining a f
 - [ ] SME review of 300 scenarios (`review_status` checks)
 - [ ] All 10 code-review findings fixed + tested
 - [ ] Secrets rotated (Supabase, Paddle, tokens) in production
-- [ ] Privacy/terms/refund pages live
+- [x] Privacy/terms/refund pages live
 - [ ] Rate limiting in place
 
 ---
@@ -320,7 +320,7 @@ GH600 Lab has been built as a **paid-ready, revenue-critical MVP** combining a f
 
 ## Known Gaps (see `docs/history/known-issues.md`)
 
-- Privacy, terms, refund pages (open)
+- Legal routes complete: privacy, terms, and refunds
 - Rate limiting / bot controls (open)
 - 300-scenario editorial review (deliberate: serving as `needs_sme_review`)
 - Longer-term: Paddle API checkout (vs. hosted link)
@@ -442,7 +442,7 @@ gh600-lab/
    - (One-field update, no deploy needed)
 
 5. **Operationalize** (pre-go-live)
-   - Add privacy/terms/refund/contact pages
+   - Keep privacy/terms/refund wording current; support email and issue form provide contact paths
    - Add rate limiting / bot controls (beyond per-code lockout)
    - Rotate secrets (Supabase, Paddle, admin tokens) to live mode
    - Set up error alerting + monitoring
