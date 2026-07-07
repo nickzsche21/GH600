@@ -220,22 +220,22 @@ returns table (plan text, email text) as $$
 declare
   v_plan text;
 begin
-  update public.access_codes
-  set uses = uses + 1, last_used_at = now()
-  where code = p_code
-    and active
-    and (email = '*' or lower(email) = lower(p_email))
-    and (max_uses is null or uses < max_uses)
-    and (expires_at is null or expires_at > now())
+  update public.access_codes ac
+  set uses = ac.uses + 1, last_used_at = now()
+  where ac.code = p_code
+    and ac.active
+    and (ac.email = '*' or lower(ac.email) = lower(p_email))
+    and (ac.max_uses is null or ac.uses < ac.max_uses)
+    and (ac.expires_at is null or ac.expires_at > now())
     and not exists (
       select 1 from public.access_code_attempts a
       where a.code = p_code and a.email = lower(p_email)
         and a.locked_until is not null and a.locked_until > now()
     )
-  returning access_codes.plan into v_plan;
+  returning ac.plan into v_plan;
 
   if v_plan is not null then
-    delete from public.access_code_attempts where code = p_code and email = lower(p_email);
+    delete from public.access_code_attempts aca where aca.code = p_code and aca.email = lower(p_email);
     return query select v_plan, p_email;
   end if;
   return;

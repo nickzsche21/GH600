@@ -1,6 +1,8 @@
 # GH600 Lab
 
-An interactive, scenario-based MVP for the GitHub Certified: Agentic AI Developer (GH-600) exam.
+**LIVE at https://gh600.com** 🚀
+
+An interactive, scenario-based paid MVP for the GitHub Certified: Agentic AI Developer (GH-600) exam. Free diagnostic (12 questions) + Founder ($29 / 120 questions / 3 mocks) + Pro ($49 / 300 questions / 6 mocks + drills). Powered by Vercel, Supabase, and Paddle.
 
 ## Run locally
 

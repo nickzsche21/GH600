@@ -10,9 +10,32 @@
 
 ## Summary
 
-**Status: Phase 1 (Core MVP) + Phase 2 (Code-Review Fixes) COMPLETE ✅**
+**Status: Phase 1 (Core MVP) + Phase 2 (Code-Review Fixes) + PHASE 3 (DEPLOYED) ✅✅✅**
 
-All 10 code-review findings from the 2026-07-06 paid-lab review have been fixed, tested (54 tests), and verified via manual Paddle sandbox + `vercel dev` checks. The system is now ready for staging deployment and pre-launch operational work.
+All 10 code-review findings from the 2026-07-06 paid-lab review have been fixed, tested (54 tests), and verified via manual Paddle sandbox + `vercel dev` checks. **The site is now live at https://gh600.com** with:
+- Free 12-question diagnostic (lead magnet)
+- Founder Access ($29) with 120 questions / 3 mocks
+- Pro Tier ($49) with 300 questions / 6 mocks + drills
+- Paddle payment integration (live mode)
+- Entitlements & session token system
+- Server-graded Pro lab scenarios
+
+---
+
+## 🚀 Deployed to Production
+
+**Live at https://gh600.com** with:
+- Free diagnostic (12-question lead magnet, email capture)
+- Founder Access ($29 one-time, 120 questions / 3 mocks)
+- Pro Tier ($49 one-time, 300 questions / 6 mocks + drills)
+- Team/Cram (via manual Wise grants)
+- Paddle payment integration (live mode)
+- Full entitlements & session management
+- Server-graded Pro lab scenarios
+- Production Supabase backend
+- Vercel Edge Functions
+
+**For operations guidance, see:** `docs/PRODUCTION_DEPLOYMENT.md`
 
 ---
 

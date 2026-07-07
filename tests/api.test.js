@@ -5,6 +5,9 @@ import { POST as verifyAccess } from "../api/access/verify.js";
 import { POST as createLead } from "../api/lead.js";
 import { POST as diagnosticComplete } from "../api/diagnostic/complete.js";
 import { POST as adminGrant } from "../api/admin/grant.js";
+import { POST as scenariosProgress } from "../api/scenarios/progress.js";
+import { POST as scenariosReset } from "../api/scenarios/reset.js";
+import { issueSession } from "../api/_lib/entitlements.js";
 
 process.env.SUPABASE_URL = "https://project.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "server-secret";
@@ -199,6 +202,91 @@ test("admin grant rejects requests with a missing or wrong bearer token", async 
   assert.equal(missing.status, 401);
   const wrong = await adminGrant(request("/api/admin/grant", { email: "buyer@example.com", plan: "team", source: "wise", reference: "wise-1" }, { authorization: "Bearer wrong-token" }));
   assert.equal(wrong.status, 401);
+});
+
+function mockSessionFetch(entitlement, extra) {
+  let storedHash;
+  return async (url, options) => {
+    const path = pathOf(url);
+    const params = new URL(url).searchParams;
+    if (path.endsWith("/access_sessions") && options.method === "POST") {
+      storedHash = JSON.parse(options.body).token_hash;
+      return Response.json([{ id: "session-row" }], { status: 201 });
+    }
+    if (path.endsWith("/access_sessions") && options.method === "GET") {
+      const matches = params.get("token_hash") === `eq.${storedHash}`;
+      return Response.json(matches ? [{
+        id: "session-row", email: entitlement.email, plan: entitlement.plan,
+        expires_at: new Date(Date.now() + 60000).toISOString(), revoked: false
+      }] : []);
+    }
+    return extra(path, params, options);
+  };
+}
+
+test("scenarios/progress computes per-mock and core totals, excluding drills from the core count", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    const entitlement = { id: "ent-progress", email: "buyer@example.com", plan: "pro" };
+    globalThis.fetch = mockSessionFetch(entitlement, path => {
+      if (path.endsWith("/gh600_scenarios_v2")) {
+        return Response.json([
+          { id: "s1", mock_id: "MOCK_1" },
+          { id: "s2", mock_id: "MOCK_1" },
+          { id: "s3", mock_id: "DRILL" }
+        ]);
+      }
+      if (path.endsWith("/scenario_attempts")) return Response.json([{ scenario_id: "s1" }, { scenario_id: "s3" }]);
+      return Response.json([]);
+    });
+    const { token } = await issueSession(entitlement);
+    const response = await scenariosProgress(request("/api/scenarios/progress", { token, session_id: "sess-abc" }));
+    const body = await response.json();
+    assert.equal(body.ok, true);
+    assert.deepEqual(body.mocks.MOCK_1, { completed: 1, total: 2 });
+    assert.deepEqual(body.mocks.DRILL, { completed: 1, total: 1 });
+    assert.equal(body.core.completed, 1);
+    assert.equal(body.core.total, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("scenarios/reset rejects a mock not included in the caller's plan", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    const entitlement = { id: "ent-reset-1", email: "buyer@example.com", plan: "founding_access" };
+    globalThis.fetch = mockSessionFetch(entitlement, () => Response.json([]));
+    const { token } = await issueSession(entitlement);
+    const response = await scenariosReset(request("/api/scenarios/reset", { token, session_id: "sess-abc", mock_id: "MOCK_5" }));
+    assert.equal(response.status, 403);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("scenarios/reset deletes this session's attempts for the mock's scenario ids", async () => {
+  const originalFetch = globalThis.fetch;
+  let deleteQuery;
+  try {
+    const entitlement = { id: "ent-reset-2", email: "buyer@example.com", plan: "founding_access" };
+    globalThis.fetch = mockSessionFetch(entitlement, (path, params, options) => {
+      if (path.endsWith("/gh600_scenarios_v2")) return Response.json([{ id: "s1" }, { id: "s2" }]);
+      if (path.endsWith("/scenario_attempts") && options.method === "DELETE") {
+        deleteQuery = params;
+        return new Response(null, { status: 204 });
+      }
+      return Response.json([]);
+    });
+    const { token } = await issueSession(entitlement);
+    const response = await scenariosReset(request("/api/scenarios/reset", { token, session_id: "sess-abc", mock_id: "MOCK_1" }));
+    const body = await response.json();
+    assert.equal(body.ok, true);
+    assert.equal(deleteQuery.get("session_id"), "eq.sess-abc");
+    assert.equal(deleteQuery.get("scenario_id"), 'in.("s1","s2")');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("admin grant issues a token for a valid bearer token", async () => {

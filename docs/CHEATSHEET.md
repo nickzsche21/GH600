@@ -1,6 +1,7 @@
 # GH600 Lab — Developer Cheatsheet
 
-**Last updated:** 2026-07-07
+**Last updated:** 2026-07-07  
+**Status:** 🚀 LIVE at https://gh600.com (production deployed, paid tiers active)
 
 ---
 

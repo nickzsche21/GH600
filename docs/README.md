@@ -1,17 +1,20 @@
 # Docs index
 
-Deep reference material for GH600 Lab. `CLAUDE.md` (repo root) is the
-operating rules + retrieval map; this tree is what it points into.
+**GH600 Lab is LIVE at https://gh600.com** 🚀
+
+Deep reference material for GH600 Lab (production deployed, paid tier active). `CLAUDE.md` (repo root) is the operating rules + retrieval map; this tree is what it points into.
 
 ## Quick start
-- **`LATEST_CHANGES.md`** — What changed in the latest update (2026-07-07):
-  Phase 2 code-review fixes complete, 10/10 findings fixed, ready for staging.
+- **`LATEST_CHANGES.md`** — What changed (2026-07-07): Phase 2 fixes complete,
+  all 10 findings fixed, deployed to gh600.com.
+- **`PRODUCTION_DEPLOYMENT.md`** — Operations guide for the live site:
+  health checks, monitoring, incident response, runbooks, secrets rotation.
 - **`QUICK_START.md`** — "I want to…" guide for common tasks (run locally,
   deploy, add endpoints, understand tier structure, debug).
 - **`CHEATSHEET.md`** — command reference, file locations, tier breakdown,
   API endpoints, database queries, troubleshooting, security checklist.
-- **`DOCUMENTATION_UPDATES.md`** — summary of all docs created/updated with
-  new files listed, updated sections, navigation guide, and next steps.
+- **`DOCUMENTATION_UPDATES.md`** — summary of docs created/updated with
+  new files, updated sections, navigation guide, and next steps.
 
 ## Architecture & engineering
 - `architecture/system-map.md` — how the static frontend, API functions,

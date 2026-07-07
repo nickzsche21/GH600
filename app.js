@@ -291,8 +291,39 @@ let proAnswers = [];
 let proAttemptCount = 0;
 let proScenarioStartedAt = 0;
 let currentMockId = null;
+let planProgress = { mocks: {}, core: { completed: 0, total: 0 } };
+
+async function fetchPlanProgress() {
+  const token = localStorage.getItem("gh600lab-session-token") || "";
+  const response = await apiRequest("/scenarios/progress", { token, session_id: sessionId });
+  return response?.ok ? response : { ok: false, mocks: {}, core: { completed: 0, total: 0 } };
+}
+
+const mockResumeDialog = $("#mock-resume-dialog");
+$$('[data-close-mock-resume]').forEach(button => button.addEventListener("click", () => mockResumeDialog.close()));
 
 async function startProLab(mockId) {
+  planProgress = await fetchPlanProgress();
+  const bucket = planProgress.mocks[mockId] || { completed: 0, total: 0 };
+  if (bucket.completed > 0) {
+    $("#mock-resume-heading").textContent = `${MOCK_LABELS[mockId] || "This mock"} is ${bucket.completed >= bucket.total ? "complete" : "in progress"}.`;
+    $("#mock-resume-copy").textContent = `You've answered ${bucket.completed} of ${bucket.total} questions here. Continue where you left off, or restart from scratch.`;
+    $("#mock-resume-continue").onclick = () => { mockResumeDialog.close(); beginProLabRun(mockId); };
+    $("#mock-resume-restart").onclick = async () => {
+      mockResumeDialog.close();
+      const token = localStorage.getItem("gh600lab-session-token") || "";
+      await apiRequest("/scenarios/reset", { token, session_id: sessionId, mock_id: mockId });
+      if (mockId !== "DRILL") planProgress.core.completed = Math.max(0, planProgress.core.completed - bucket.completed);
+      planProgress.mocks[mockId] = { ...bucket, completed: 0 };
+      beginProLabRun(mockId);
+    };
+    mockResumeDialog.showModal();
+    return;
+  }
+  beginProLabRun(mockId);
+}
+
+function beginProLabRun(mockId) {
   currentMockId = mockId;
   proAnswers = [];
   proAttemptCount = 0;
@@ -306,7 +337,7 @@ async function startProLab(mockId) {
   }, 1000);
   if (!quizDialog.open) quizDialog.showModal();
   document.body.style.overflow = "hidden";
-  await renderNextProScenario();
+  renderNextProScenario();
 }
 
 async function renderNextProScenario() {
@@ -323,9 +354,7 @@ async function renderNextProScenario() {
   const domain = domains[currentProScenario.primary_domain - 1];
   const artifact = currentProScenario.artifact_type === "code" && currentProScenario.artifact_content
     ? JSON.parse(currentProScenario.artifact_content) : null;
-  const mockLength = MOCK_LENGTHS[currentMockId] || 40;
-  $("#quiz-progress-label").textContent = `${MOCK_LABELS[currentMockId] || "Pro lab"} · scenario ${proAttemptCount}`;
-  $("#quiz-progress-bar").style.width = `${Math.min(100, (proAttemptCount / mockLength) * 100)}%`;
+  updateProProgressDisplay();
   quizBody.innerHTML = `
     <section class="quiz-question" style="--domain-color:${domain.color}">
       <aside class="quiz-sidebar">
@@ -355,6 +384,18 @@ async function renderNextProScenario() {
   $("#submit-answer").addEventListener("click", checkProAnswer);
 }
 
+function updateProProgressDisplay() {
+  const bucket = planProgress.mocks[currentMockId] || { completed: 0, total: MOCK_LENGTHS[currentMockId] || 40 };
+  if (currentMockId === "DRILL") {
+    $("#quiz-progress-label").textContent = `${MOCK_LABELS.DRILL} · ${bucket.completed}/${bucket.total}`;
+    $("#quiz-progress-bar").style.width = `${Math.min(100, (bucket.completed / (bucket.total || 1)) * 100)}%`;
+    return;
+  }
+  const core = planProgress.core;
+  $("#quiz-progress-label").textContent = `${MOCK_LABELS[currentMockId] || "Pro lab"} · ${core.completed}/${core.total || 1} completed`;
+  $("#quiz-progress-bar").style.width = `${Math.min(100, (core.completed / (core.total || 1)) * 100)}%`;
+}
+
 async function checkProAnswer() {
   if (selected === null || locked) return;
   locked = true;
@@ -376,9 +417,13 @@ async function checkProAnswer() {
   });
   $("#explanation-slot").innerHTML = `<div class="explanation ${correct ? "correct-exp" : "wrong-exp"}"><strong>${correct ? "Good call." : "Not quite."}</strong><p>${escapeHtml(response?.explanation || "")}</p></div>`;
   trackEvent("paid_scenario_completed", { scenario_id: currentProScenario.id, mock_id: currentMockId, correct });
+  const bucket = planProgress.mocks[currentMockId];
+  if (bucket) bucket.completed++;
+  if (currentMockId !== "DRILL") planProgress.core.completed = Math.min(planProgress.core.total, planProgress.core.completed + 1);
+  updateProProgressDisplay();
   action.disabled = false;
-  const mockLength = MOCK_LENGTHS[currentMockId] || 40;
-  const mockComplete = proAttemptCount >= mockLength;
+  const mockTotal = bucket?.total || MOCK_LENGTHS[currentMockId] || 40;
+  const mockComplete = (bucket?.completed ?? proAttemptCount) >= mockTotal;
   action.innerHTML = mockComplete ? "View readiness report <span>→</span>" : "Next scenario <span>→</span>";
   action.onclick = mockComplete ? () => finishProLab() : () => renderNextProScenario();
 }
@@ -531,6 +576,15 @@ function renderMockPicker(plan) {
     proAreaDialog.close();
     startProLab(button.dataset.mock);
   }));
+  fetchPlanProgress().then(progress => {
+    $$("[data-mock]", $("#mock-picker")).forEach(button => {
+      const mockId = button.dataset.mock;
+      const bucket = progress.mocks[mockId];
+      if (!bucket || !bucket.total) return;
+      const status = bucket.completed >= bucket.total ? "Completed ✓" : bucket.completed > 0 ? "In progress" : "Not started";
+      button.innerHTML = `${MOCK_LABELS[mockId]} <small>${status} · ${bucket.completed}/${bucket.total}</small><span>→</span>`;
+    });
+  });
 }
 
 async function openProGate() {

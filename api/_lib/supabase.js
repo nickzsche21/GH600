@@ -46,3 +46,7 @@ export function update(table, query, patch) {
 export function rpc(name, args = {}) {
   return request(`rpc/${name}`, { method: "POST", body: args });
 }
+
+export function remove(table, query) {
+  return request(table, { method: "DELETE", query });
+}
