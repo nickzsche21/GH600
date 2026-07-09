@@ -187,6 +187,24 @@ When Paddle clears verification: set `founder`/`pro` `provider` back to `"paddle
 it's inert without `GUMROAD_PRODUCT_*` set, and lets any Gumroad buyers keep their
 access. No data migration needed.
 
+## Phase 6 — Vercel Hobby function-limit fix (2026-07-10, executed)
+
+Deploy failed: Hobby allows ≤12 Serverless Functions; the repo had 14 routed
+`api/*.js` files (`_lib/*` is underscore-prefixed and not counted). Resolved by
+**consolidating related routes into Vercel dynamic-route files** — no
+functionality dropped, no client URL changed (one function serves all its
+sub-paths; the handler dispatches on the last path segment):
+
+- `api/scenarios/[action].js` ← next + answer + progress + reset (4→1)
+- `api/access/[action].js` ← verify + session (2→1)
+- `api/admin/[action].js` ← grant + revoke (2→1)
+
+**14 → 9 functions** (3 to spare). Each dynamic file exports the per-action
+handlers as named exports (so tests import them directly) plus a `POST` router.
+Old per-endpoint files deleted; test imports repointed to the `[action].js`
+files. All 71 tests green. Paddle webhook, admin, analytics `/event`, and
+`/issue-report` all retained — nothing from the "defer" list had to be removed.
+
 ## Go / no-go checklist
 
 - [ ] `GUMROAD_*` env vars set in Vercel (access token server-only).

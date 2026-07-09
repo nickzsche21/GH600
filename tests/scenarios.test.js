@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { POST as scenariosNext } from "../api/scenarios/next.js";
-import { POST as scenariosAnswer } from "../api/scenarios/answer.js";
+import { next as scenariosNext, answer as scenariosAnswer } from "../api/scenarios/[action].js";
 import { issueSession } from "../api/_lib/entitlements.js";
 
 process.env.SUPABASE_URL = "https://project.supabase.co";

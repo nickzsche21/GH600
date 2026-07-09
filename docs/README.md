@@ -20,9 +20,13 @@ Deep reference material for GH600 Lab (production deployed, paid tier active). `
 - `architecture/system-map.md` — how the static frontend, API functions,
   and Supabase fit together; the full revenue-flow request path including
   mock-based Pro lab delivery.
-- `engineering/api-contracts.md` — all 12 `api/*.js` endpoints: request
-  body, response shape, validation, tier gating, side effects. Includes
-  the scenario-map helper and plan-tier routing.
+- `engineering/api-contracts.md` — the `api/*.js` endpoints: request body,
+  response shape, validation, tier gating, side effects. Includes the
+  scenario-map helper and plan-tier routing. NOTE: to stay under the Vercel
+  Hobby 12-serverless-function cap, related routes are consolidated into
+  dynamic-route files — `api/scenarios/[action].js` (next/answer/progress/
+  reset), `api/access/[action].js` (verify/session), `api/admin/[action].js`
+  (grant/revoke) — 9 functions total. Client URLs are unchanged.
 - `engineering/data-model.md` — 11 Supabase tables (`supabase/schema.sql`),
   the in-memory free diagnostic (`app.js` `questions` array), the
   300-scenario premium bank (`gh600_scenarios_v2`), and the scenario-mapping
