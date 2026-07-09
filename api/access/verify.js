@@ -1,6 +1,7 @@
 import { handleError, HttpError, json, readJson, requireEmail, text } from "../_lib/http.js";
 import { findActiveEntitlement, grantEntitlement, issueSession, redeemAccessCode, registerFailedCode } from "../_lib/entitlements.js";
 import { resolvePlan } from "../_lib/plans.js";
+import { verifyGumroadLicense } from "../_lib/gumroad.js";
 
 export async function POST(request) {
   try {
@@ -20,22 +21,39 @@ export async function POST(request) {
     }
 
     const redeemed = await redeemAccessCode(code, email);
-    if (!redeemed) {
-      await registerFailedCode(code, email);
-      return json({ ok: false, error: "That email/code pair is not active" }, 401);
-    }
-    const plan = resolvePlan(redeemed.plan);
-    if (!plan) throw new HttpError(422, "Unknown plan on access code");
+    if (redeemed) {
+      const plan = resolvePlan(redeemed.plan);
+      if (!plan) throw new HttpError(422, "Unknown plan on access code");
 
-    const entitlement = await grantEntitlement({
-      email,
-      plan: plan.id,
-      source: "manual",
-      granted_by: `code:${code}`,
-      reference
-    });
-    const session = await issueSession(entitlement);
-    return json({ ok: true, plan: plan.id, token: session.token, expires_at: session.expires_at });
+      const entitlement = await grantEntitlement({
+        email,
+        plan: plan.id,
+        source: "manual",
+        granted_by: `code:${code}`,
+        reference
+      });
+      const session = await issueSession(entitlement);
+      return json({ ok: true, plan: plan.id, token: session.token, expires_at: session.expires_at });
+    }
+
+    // Not a local access_codes match — try it as a Gumroad license key
+    // before failing. Doesn't count toward the code lockout on its own path.
+    const gumroadMatch = await verifyGumroadLicense(email, code);
+    if (gumroadMatch) {
+      const gumroadReference = `gumroad:${gumroadMatch.plan}:${email}`;
+      const entitlement = await grantEntitlement({
+        email,
+        plan: gumroadMatch.plan,
+        source: "manual",
+        granted_by: "gumroad_license",
+        reference: gumroadReference
+      });
+      const session = await issueSession(entitlement);
+      return json({ ok: true, plan: entitlement.plan, token: session.token, expires_at: session.expires_at });
+    }
+
+    await registerFailedCode(code, email);
+    return json({ ok: false, error: "That email/code pair is not active" }, 401);
   } catch (error) {
     return handleError(error);
   }

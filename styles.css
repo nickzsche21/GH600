@@ -332,6 +332,9 @@ dialog::backdrop { background: rgba(12, 16, 13, .75); backdrop-filter: blur(8px)
 .access-modal input, .access-modal select { width: 100%; height: 47px; border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; background: white; color: var(--ink); }
 .access-modal textarea { min-height: 110px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: white; color: var(--ink); font: inherit; }
 .access-modal small { color: var(--muted); font-size: 9px; }
+.important-note { display: flex; gap: 10px; align-items: flex-start; padding: 13px 14px; margin-top: 16px; background: rgba(200, 255, 71, .08); border: 1px solid rgba(200, 255, 71, .25); border-radius: 8px; }
+.important-asterisk { color: var(--coral); font-weight: 800; font-size: 16px; margin-top: -1px; }
+.important-note p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .pro-modal { width: min(620px, calc(100% - 32px)); border-radius: 17px; padding: 42px; background: var(--ink); color: white; box-shadow: var(--shadow); }
 .pro-modal .modal-close { color: white; border-color: rgba(255,255,255,.18); }
 .pro-modal h2 { margin: 17px 0 9px; font-size: 40px; line-height: 1.05; letter-spacing: -.06em; }

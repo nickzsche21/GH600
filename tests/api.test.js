@@ -38,8 +38,8 @@ test("checkout ignores client pricing, resolves the plan's provider, and returns
     const body = await response.json();
     assert.equal(response.status, 201);
     assert.equal(inserted.amount, 29);
-    assert.equal(inserted.provider, "paddle");
-    assert.equal(body.provider, "paddle");
+    assert.equal(inserted.provider, "gumroad");
+    assert.equal(body.provider, "gumroad");
     assert.equal(body.redirect_url, "https://rzp.io/rzp/founding");
   } finally {
     globalThis.fetch = originalFetch;

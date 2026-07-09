@@ -3,10 +3,12 @@ const founder = {
   label: "Founding Access",
   amount: 29,
   currency: "USD",
-  provider: "paddle",
-  checkoutEnv: "PADDLE_CHECKOUT_FOUNDING",
+  provider: "gumroad",
+  checkoutEnv: "GUMROAD_CHECKOUT_FOUNDING",
+  paddleCheckoutEnv: "PADDLE_CHECKOUT_FOUNDING",
   priceEnv: "PADDLE_PRICE_FOUNDING",
-  legacyEnv: "RAZORPAY_FOUNDING_URL"
+  legacyEnv: "RAZORPAY_FOUNDING_URL",
+  productEnv: "GUMROAD_PRODUCT_FOUNDING"
 };
 const team = {
   id: "team_pack",
@@ -33,10 +35,12 @@ const pro = {
   label: "Pro",
   amount: 49,
   currency: "USD",
-  provider: "paddle",
-  checkoutEnv: "PADDLE_CHECKOUT_PRO",
+  provider: "gumroad",
+  checkoutEnv: "GUMROAD_CHECKOUT_PRO",
+  paddleCheckoutEnv: "PADDLE_CHECKOUT_PRO",
   priceEnv: "PADDLE_PRICE_PRO",
-  legacyEnv: null
+  legacyEnv: null,
+  productEnv: "GUMROAD_PRODUCT_PRO"
 };
 
 const plans = {
@@ -54,6 +58,20 @@ export function resolvePlanByPriceId(priceId) {
   return Object.values(plans).find(plan => plan.priceEnv && process.env[plan.priceEnv] === priceId) || null;
 }
 
+export function resolvePlanByGumroadProduct(productId) {
+  return Object.values(plans).find(plan => plan.productEnv && process.env[plan.productEnv] === productId) || null;
+}
+
+// Unique plans (de-duped across id aliases) that have a Gumroad product configured.
+export function gumroadPlans() {
+  const seen = new Set();
+  return Object.values(plans).filter(plan => {
+    if (!plan.productEnv || seen.has(plan.id)) return false;
+    seen.add(plan.id);
+    return true;
+  });
+}
+
 function readHttpsUrl(envName) {
   if (!envName) return null;
   const value = process.env[envName]?.trim();
@@ -61,7 +79,7 @@ function readHttpsUrl(envName) {
 }
 
 export function checkoutUrl(plan) {
-  return readHttpsUrl(plan.checkoutEnv) || readHttpsUrl(plan.legacyEnv);
+  return readHttpsUrl(plan.checkoutEnv) || readHttpsUrl(plan.paddleCheckoutEnv) || readHttpsUrl(plan.legacyEnv);
 }
 
 // Premium bank v2 (`gh600_scenarios_v2`) content tiers, widest first — a plan

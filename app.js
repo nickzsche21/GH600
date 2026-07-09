@@ -449,7 +449,7 @@ function expireProLab() {
   closeQuiz();
   localStorage.removeItem("gh600lab-session-token");
   const message = $("#pro-gate-message");
-  if (message) message.textContent = "Your session expired — please re-enter your email and access code.";
+  if (message) message.textContent = "Your session expired — please re-enter your email and license key.";
   proGateDialog.showModal();
 }
 
@@ -606,7 +606,7 @@ $("#pro-gate-form").addEventListener("submit", async event => {
   trackEvent("pro_gate_attempted", { has_email: Boolean(email), code_length: code.length });
   const remote = await apiRequest("/access/verify", { email, code });
   if (!remote?.ok) {
-    $("#pro-gate-message").textContent = "That email/code pair is not active. Check the code or contact support.";
+    $("#pro-gate-message").textContent = "That email/license key pair isn't active — check the key from your Gumroad receipt.";
     return;
   }
   localStorage.setItem("gh600lab-session-token", remote.token);

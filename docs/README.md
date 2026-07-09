@@ -62,6 +62,20 @@ Deep reference material for GH600 Lab (production deployed, paid tier active). `
   mock-cap terminal button), Phase 3 hardening (widened Paddle replay window,
   quoted PostgREST filters, shared `api/_lib/crypto.js`). See
   `history/known-issues.md` "Fix status" for the finding-by-finding mapping.
+- `plans/gumroad-interim-checkout-2026-07-09.md` — **executed (Phases 1–4).**
+  Sell via Gumroad while Paddle is stuck in verification: env-driven checkout
+  redirect (`gumroad` provider in `plans.js`/`providers.js`, `GUMROAD_CHECKOUT_*`
+  preferred over `PADDLE_CHECKOUT_*` over the legacy env), license-key unlock
+  branch in `/api/access/verify` (`api/_lib/gumroad.js` `verifyGumroadLicense()`,
+  verified live against Gumroad's license API, no keys stored locally, fails
+  closed on refund/dispute/email-mismatch/network error), Pro-gate copy changed
+  to "License key". Phase 5 (Gumroad sale webhook + schema migration for
+  automatic refund revocation) is **not done** — still optional/deferred.
+- `plans/gumroad-interim-checkout-remaining-2026-07-09.md` — **your
+  to-do.** What's left after the code (Phases 1–4 above): Gumroad
+  dashboard/token/product-id setup, the five `GUMROAD_*` env vars in
+  Vercel, live purchase → license-key unlock verification checklist, and
+  the deferred Phase 5 webhook work.
 
 Business strategy (pricing, positioning, kill criteria) lives at the repo
 root in `GH600-Lab-Launch-Plan.md`, not under `docs/` — referenced directly

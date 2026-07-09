@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkoutUrl, contentTiers, allowedMocks, resolvePlan, resolvePlanByPriceId } from "../api/_lib/plans.js";
+import { checkoutUrl, contentTiers, allowedMocks, resolvePlan, resolvePlanByPriceId, resolvePlanByGumroadProduct } from "../api/_lib/plans.js";
 import { normalizeEmail } from "../api/_lib/http.js";
 
 test("server owns plan pricing", () => {
@@ -12,10 +12,10 @@ test("server owns plan pricing", () => {
 });
 
 test("every plan resolves to a payment provider", () => {
-  assert.equal(resolvePlan("founder").provider, "paddle");
+  assert.equal(resolvePlan("founder").provider, "gumroad");
   assert.equal(resolvePlan("team").provider, "wise");
   assert.equal(resolvePlan("cram").provider, "wise");
-  assert.equal(resolvePlan("pro").provider, "paddle");
+  assert.equal(resolvePlan("pro").provider, "gumroad");
 });
 
 test("content tiers gate the premium bank v2 by plan", () => {
@@ -33,6 +33,7 @@ test("allowed mocks match the sold tier structure (3 vs 6 + drills)", () => {
 });
 
 test("checkout URL only accepts https, preferring the Paddle env over the legacy one", () => {
+  delete process.env.GUMROAD_CHECKOUT_FOUNDING;
   delete process.env.PADDLE_CHECKOUT_FOUNDING;
   process.env.RAZORPAY_FOUNDING_URL = "javascript:alert(1)";
   assert.equal(checkoutUrl(resolvePlan("founder")), null);
@@ -42,6 +43,15 @@ test("checkout URL only accepts https, preferring the Paddle env over the legacy
   assert.equal(checkoutUrl(resolvePlan("founder")), "https://gh600.paddle.io/checkout/founding");
   process.env.PADDLE_CHECKOUT_FOUNDING = "javascript:alert(1)";
   assert.equal(checkoutUrl(resolvePlan("founder")), "https://rzp.io/rzp/test");
+});
+
+test("checkout URL prefers the Gumroad env over both the Paddle and legacy fallbacks", () => {
+  process.env.PADDLE_CHECKOUT_FOUNDING = "https://gh600.paddle.io/checkout/founding";
+  process.env.RAZORPAY_FOUNDING_URL = "https://rzp.io/rzp/test";
+  process.env.GUMROAD_CHECKOUT_FOUNDING = "https://gh600.gumroad.com/l/founding";
+  assert.equal(checkoutUrl(resolvePlan("founder")), "https://gh600.gumroad.com/l/founding");
+  delete process.env.GUMROAD_CHECKOUT_FOUNDING;
+  assert.equal(checkoutUrl(resolvePlan("founder")), "https://gh600.paddle.io/checkout/founding");
 });
 
 test("wise-only plans never resolve a card checkout redirect", () => {
@@ -55,6 +65,14 @@ test("Paddle price id maps back to the correct plan", () => {
   process.env.PADDLE_PRICE_FOUNDING = "pri_founding_123";
   assert.equal(resolvePlanByPriceId("pri_founding_123").id, "founding_access");
   assert.equal(resolvePlanByPriceId("pri_unknown"), null);
+});
+
+test("Gumroad product id maps back to the correct plan", () => {
+  process.env.GUMROAD_PRODUCT_FOUNDING = "prod_founding_123";
+  process.env.GUMROAD_PRODUCT_PRO = "prod_pro_123";
+  assert.equal(resolvePlanByGumroadProduct("prod_founding_123").id, "founding_access");
+  assert.equal(resolvePlanByGumroadProduct("prod_pro_123").id, "pro");
+  assert.equal(resolvePlanByGumroadProduct("prod_unknown"), null);
 });
 
 test("email normalization is stable", () => {

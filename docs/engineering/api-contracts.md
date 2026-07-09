@@ -43,10 +43,13 @@ checkout link via `api/_lib/providers.js` (`checkoutUrl()` requires
 `https://`), inserts a `payment_intents` row with `status`
 `"redirect_ready"` or `"manual_followup"`, and returns `{ ok: true,
 intent_id, plan, amount, currency, provider, redirect_url,
-manual_followup }` (201). Founding Access resolves to Paddle
-(`redirect_url` set); Team/Cram resolve to Wise (`manual_followup: true`,
-no redirect — founder follows up and completes the sale via
-`/api/admin/grant`).
+manual_followup }` (201). Founding Access and Pro resolve to **Gumroad**
+(`redirect_url` set — interim provider while Paddle is stuck in merchant
+verification; `checkoutUrl()` tries `GUMROAD_CHECKOUT_*` then
+`PADDLE_CHECKOUT_*` then the legacy env, so unsetting the Gumroad env
+flips a plan back to Paddle with no code change); Team/Cram resolve to
+Wise (`manual_followup: true`, no redirect — founder follows up and
+completes the sale via `/api/admin/grant`).
 
 ## `POST /api/webhooks/paddle` — `api/webhooks/paddle.js`
 
@@ -68,12 +71,24 @@ once the signature is valid, even if no matching plan/email is found.
 Requires `email` and `code`. Calls the `redeem_access_code` Postgres RPC
 (atomic — kills the old read-then-write race), which checks
 `active`/email-match/expiry/`max_uses`/`locked_until` in one statement. On
-failure, calls `register_failed_code` (locks the code for 15 minutes after
-5 failures) and returns `{ ok: false, error }` (401). On success, calls
-`grantEntitlement({ source: 'manual' })` + `issueSession()` and returns
-`{ ok: true, plan, token, expires_at }` — a code redemption is just one
-*entitlement source* among several (Paddle webhook, admin grant), not a
-separate access mechanism.
+success, calls `grantEntitlement({ source: 'manual' })` + `issueSession()`
+and returns `{ ok: true, plan, token, expires_at }` — a code redemption is
+just one *entitlement source* among several (Paddle webhook, Gumroad
+license, admin grant), not a separate access mechanism.
+
+If the local code lookup fails (no `access_codes` match), the same `code`
+value is retried as a **Gumroad license key** via
+`verifyGumroadLicense()` (`api/_lib/gumroad.js`) before giving up — this
+is the interim unlock path while Paddle is down. It calls Gumroad's
+`POST /v2/licenses/verify` for each plan with a `GUMROAD_PRODUCT_*` env
+set, rejects a refunded/disputed/chargebacked purchase or an email
+mismatch, and fails closed (`null`) on any network/JSON error. A match
+grants with `source: 'manual'`, `granted_by: 'gumroad_license'`, and
+reference `gumroad:<plan>:<email>` (mirrors the `code:<code>:<email>`
+reference so re-login is idempotent). `register_failed_code` (locks the
+code for 15 minutes after 5 failures) and the 401 only fire when **both**
+the local code and the Gumroad check fail — a real license key never
+counts toward the lockout.
 
 ## `POST /api/access/session` — `api/access/session.js`
 
