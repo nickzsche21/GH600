@@ -293,13 +293,16 @@ approval_required: false</code></pre>
     <button class="icon-button modal-close" data-close-pro aria-label="Close">×</button>
     <span class="modal-kicker">PAID MEMBER ACCESS</span>
     <h2>Enter the Pro lab.</h2>
-    <p>Use the email from checkout and the access code sent after payment.</p>
+    <p>Use the email from checkout and the license key on your Gumroad receipt.</p>
     <form id="pro-gate-form">
       <label>Email address<input type="email" id="pro-email" placeholder="you@company.com" required></label>
-      <label>Access code<input type="text" id="pro-code" placeholder="GH600-XXXX" required autocomplete="off"></label>
+      <label>License key<input type="text" id="pro-code" placeholder="XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" required autocomplete="off"></label>
       <button class="button button-primary" type="submit">Unlock Pro lab <span>→</span></button>
     </form>
-    <small id="pro-gate-message">Manual access codes are fine for the first 20 customers.</small>
+    <div id="pro-gate-message" class="important-note">
+      <span class="important-asterisk">*</span>
+      <p>Your license key is on your Gumroad receipt and confirmation email.</p>
+    </div>
   </dialog>
 
   <dialog class="pro-modal" id="pro-area-dialog">

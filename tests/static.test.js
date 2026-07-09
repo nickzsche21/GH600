@@ -52,6 +52,7 @@ test("server credential name is absent from browser assets", () => {
     .map(file => readFileSync(resolve(root, file), "utf8"))
     .join("\n");
   assert.doesNotMatch(publicBundle, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.doesNotMatch(publicBundle, /GUMROAD_ACCESS_TOKEN/);
 });
 
 test("no secret-shaped values leak into browser assets", () => {

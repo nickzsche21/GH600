@@ -2,7 +2,7 @@
 
 **LIVE at https://gh600.com** 🚀
 
-An interactive, scenario-based paid MVP for the GitHub Certified: Agentic AI Developer (GH-600) exam. Free diagnostic (12 questions) + Founder ($29 / 120 questions / 3 mocks) + Pro ($49 / 300 questions / 6 mocks + drills). Powered by Vercel, Supabase, and Paddle.
+An interactive, scenario-based paid MVP for the GitHub Certified: Agentic AI Developer (GH-600) exam. Free diagnostic (12 questions) + Founder ($29 / 120 questions / 3 mocks) + Pro ($49 / 300 questions / 6 mocks + drills). Powered by Vercel, Supabase, and Paddle — checkout is routed through Gumroad as an interim provider while Paddle is in merchant verification (see `docs/plans/gumroad-interim-checkout-2026-07-09.md`).
 
 ## Run locally
 
@@ -19,22 +19,22 @@ The `file://` and static-server preview keep a minimal local fallback (no wildca
 ## Deploy the paid-ready MVP
 
 1. Create a Supabase project and run `supabase/schema.sql` in its SQL Editor.
-2. Create a Paddle account, get sandbox/live API keys, and create hosted checkout links + prices for Founding Access ($29) and Pro ($49). Team ($149) and Cram ($99) route through Wise + manual admin grant, not Paddle.
-3. In the Paddle dashboard, register the webhook URL `https://<your-domain>/api/webhooks/paddle` for `transaction.completed`, `transaction.refunded`, and `adjustment.created`, and copy the webhook secret.
+2. **Interim (current):** create two Gumroad products (Founding Access $29, Pro $49), get an access token, and set `GUMROAD_ACCESS_TOKEN`/`GUMROAD_PRODUCT_FOUNDING`/`GUMROAD_PRODUCT_PRO`/`GUMROAD_CHECKOUT_FOUNDING`/`GUMROAD_CHECKOUT_PRO`. **Once Paddle clears verification:** get sandbox/live API keys and create hosted checkout links + prices for Founding Access and Pro, then unset the `GUMROAD_CHECKOUT_*` vars to fall back to `PADDLE_CHECKOUT_*` (`api/_lib/plans.js` `checkoutUrl()`). Team ($149) and Cram ($99) route through Wise + manual admin grant either way.
+3. In the Paddle dashboard, register the webhook URL `https://<your-domain>/api/webhooks/paddle` for `transaction.completed`, `transaction.refunded`, and `adjustment.created`, and copy the webhook secret (inert while Gumroad is the active checkout provider, but safe to configure ahead of the flip-back).
 4. Generate `ENTITLEMENT_SIGNING_SECRET` and `ADMIN_API_TOKEN` (e.g. `openssl rand -hex 32`) — treat both as production secrets.
 5. Import this folder as a Vercel project (the project root must be `gh600-lab`).
 6. Add every variable from `.env.example` in Vercel Project Settings → Environment Variables.
 7. Deploy, take one diagnostic, submit an email, and verify rows appear in `leads`, `diagnostic_attempts`, and `analytics_events`.
-8. Click Founding Access and confirm the server redirects to the Paddle checkout link; complete a sandbox purchase and confirm an `entitlements` row appears and the Pro lab unlocks with a session token (not `localStorage["gh600lab-pro-access"]`).
+8. Click Founding Access and confirm the server redirects to the Gumroad product page; complete a purchase, paste the email + Gumroad license key into the Pro gate, and confirm an `entitlements` row appears and the Pro lab unlocks with a session token (not `localStorage["gh600lab-pro-access"]`).
 9. Run `node scripts/seed-scenarios-v2.js` once (with `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` set) to load the 300-scenario premium bank into `gh600_scenarios_v2` (six mock exams + drills — see `docs/history/schema-migrations.md`; the older `scripts/seed-scenarios.js` is deprecated).
 
-The service-role key, `ENTITLEMENT_SIGNING_SECRET`, `ADMIN_API_TOKEN`, and `PADDLE_WEBHOOK_SECRET`/`PADDLE_API_KEY` are server-only. Do not put any of them in `backend-config.js`, `checkout-config.js`, `access-config.js`, or any other public file.
+The service-role key, `ENTITLEMENT_SIGNING_SECRET`, `ADMIN_API_TOKEN`, `PADDLE_WEBHOOK_SECRET`/`PADDLE_API_KEY`, and `GUMROAD_ACCESS_TOKEN` are server-only. Do not put any of them in `backend-config.js`, `checkout-config.js`, `access-config.js`, or any other public file.
 
 For a local full-stack preview, install the Vercel CLI and run `vercel dev`. A plain static server intentionally has no backend.
 
 ### Token rotation checklist
 
-If any server secret is suspected exposed (e.g. found in a committed file, a shared screenshot, or a support ticket): rotate `SUPABASE_SERVICE_ROLE_KEY` and the Supabase access token in the Supabase dashboard, rotate `ADMIN_API_TOKEN` and `ENTITLEMENT_SIGNING_SECRET` (note: rotating the signing secret invalidates every outstanding session token — buyers will need to re-enter their email/code), and rotate `PADDLE_WEBHOOK_SECRET`/`PADDLE_API_KEY` in the Paddle dashboard. Update the values in Vercel immediately after rotating.
+If any server secret is suspected exposed (e.g. found in a committed file, a shared screenshot, or a support ticket): rotate `SUPABASE_SERVICE_ROLE_KEY` and the Supabase access token in the Supabase dashboard, rotate `ADMIN_API_TOKEN` and `ENTITLEMENT_SIGNING_SECRET` (note: rotating the signing secret invalidates every outstanding session token — buyers will need to re-enter their email/code), rotate `PADDLE_WEBHOOK_SECRET`/`PADDLE_API_KEY` in the Paddle dashboard, and rotate `GUMROAD_ACCESS_TOKEN` in the Gumroad dashboard. Update the values in Vercel immediately after rotating.
 
 ## Issue a manual access code
 
@@ -57,7 +57,7 @@ curl -X POST https://<your-domain>/api/admin/grant \
 
 ## Revenue flow
 
-`landing → diagnostic → email-gated report → plan form → server-owned price → (Paddle hosted checkout | Wise invoice) → webhook | admin grant → server-issued session token → Pro lab (server-graded)`
+`landing → diagnostic → email-gated report → plan form → server-owned price → (Gumroad hosted checkout | Wise invoice) → license key | admin grant → server-issued session token → Pro lab (server-graded)`
 
 ## What works
 
@@ -72,7 +72,7 @@ curl -X POST https://<your-domain>/api/admin/grant \
 - Timed quiz flow and readiness report
 - Email gate before the detailed readiness report
 - Supabase lead, diagnostic, event, payment-intent, purchase, entitlement, session, access-code, and issue-report storage
-- Founding/Pro checkout routing through a Paddle hosted checkout link, confirmed by a signature-verified webhook
+- Founding/Pro checkout routing through a Gumroad hosted checkout link (interim provider), unlocked by verifying the buyer's Gumroad license key server-side at the Pro gate; Paddle's signature-verified webhook path stays wired for when Paddle clears merchant verification
 - Team/Cram routed through Wise + an admin-token-gated manual grant endpoint
 - Server-issued, revocable session tokens gate the Pro lab — no client-trusted flags
 - Paid scenarios served and graded server-side, one scenario at a time, tier-gated per plan (no answer key in page source, no cross-tier leakage)
@@ -82,7 +82,7 @@ curl -X POST https://<your-domain>/api/admin/grant \
 
 ## Before charging customers
 
-1. Set the Supabase, Paddle, and admin/signing-secret variables in Vercel and run the end-to-end checks above, including a Paddle sandbox purchase.
+1. Set the Supabase, Gumroad, and admin/signing-secret variables in Vercel and run the end-to-end checks above, including a live Gumroad purchase (Paddle stays configured for the eventual flip-back).
 2. Remove or rotate any test access codes created in Supabase.
 3. The 300-scenario premium bank ships as `needs_sme_review` (structurally validated, not yet editorially approved) — a deliberate, accepted risk. Have a GH-600 subject-matter expert review it and flip a bad row's `review_status` to `'rejected'` to pull it from delivery immediately (no deploy needed).
 4. Privacy, terms, and refund routes are included; configure `support@gh600lab.com` routing before launch.

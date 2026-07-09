@@ -1,12 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { POST as checkout } from "../api/checkout-intent.js";
-import { POST as verifyAccess } from "../api/access/verify.js";
+import { verify as verifyAccess } from "../api/access/[action].js";
 import { POST as createLead } from "../api/lead.js";
 import { POST as diagnosticComplete } from "../api/diagnostic/complete.js";
-import { POST as adminGrant } from "../api/admin/grant.js";
-import { POST as scenariosProgress } from "../api/scenarios/progress.js";
-import { POST as scenariosReset } from "../api/scenarios/reset.js";
+import { grant as adminGrant } from "../api/admin/[action].js";
+import { progress as scenariosProgress, reset as scenariosReset } from "../api/scenarios/[action].js";
 import { issueSession } from "../api/_lib/entitlements.js";
 
 process.env.SUPABASE_URL = "https://project.supabase.co";
@@ -38,8 +37,8 @@ test("checkout ignores client pricing, resolves the plan's provider, and returns
     const body = await response.json();
     assert.equal(response.status, 201);
     assert.equal(inserted.amount, 29);
-    assert.equal(inserted.provider, "paddle");
-    assert.equal(body.provider, "paddle");
+    assert.equal(inserted.provider, "gumroad");
+    assert.equal(body.provider, "gumroad");
     assert.equal(body.redirect_url, "https://rzp.io/rzp/founding");
   } finally {
     globalThis.fetch = originalFetch;

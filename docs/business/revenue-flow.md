@@ -4,9 +4,20 @@ Funnel (also stated in root `README.md`):
 
 ```
 landing → diagnostic → email-gated report → plan form → server-owned price
-→ (Paddle hosted checkout | Wise invoice) → webhook | admin grant
+→ (Gumroad hosted checkout | Wise invoice) → license key | admin grant
 → server-issued entitlement + session token → Pro lab (server-graded)
 ```
+
+**Interim provider note (2026-07-09):** Paddle is stuck in merchant
+verification, so Founding Access and Pro checkout redirect to Gumroad
+instead (`api/_lib/plans.js`, `api/_lib/providers.js`). Gumroad is
+Merchant of Record like Paddle would be; the buyer verifies their
+per-sale **license key** at the existing Pro gate
+(`/api/access/verify` → `verifyGumroadLicense()` in
+`api/_lib/gumroad.js`) instead of the Paddle webhook firing
+automatically. See `docs/plans/gumroad-interim-checkout-2026-07-09.md`
+for the full plan and the flip-back-to-Paddle rollback (unset
+`GUMROAD_CHECKOUT_*`).
 
 ## Analytics events (`app.js` → `trackEvent()`, plus server-fired events)
 

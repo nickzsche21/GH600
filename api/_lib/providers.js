@@ -7,6 +7,12 @@ const providers = {
       return redirectUrl ? { redirectUrl } : { manual: true };
     }
   },
+  gumroad: {
+    createCheckout(plan) {
+      const redirectUrl = checkoutUrl(plan);
+      return redirectUrl ? { redirectUrl } : { manual: true };
+    }
+  },
   wise: {
     createCheckout() {
       return { manual: true };
