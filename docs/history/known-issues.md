@@ -32,7 +32,8 @@ for the current mechanism.
 `window.GH600_CHECKOUT` is empty by default and only used as a fallback
 when `/api/checkout-intent` doesn't return a `redirect_url` (i.e. the
 matching `PADDLE_CHECKOUT_*`/legacy `RAZORPAY_*_URL` env var isn't set in
-Vercel). Team/Cram never have a redirect by design — they route through
+Vercel). Team/Cram never have a card redirect by design — their public CTAs
+open a prefilled email to the founder, followed by manual payment and
 Wise/`admin/grant`. Until Paddle links are configured, Founding-Access
 checkout falls back to "Request saved — I'll follow up personally"
 (manual follow-up). This is expected pre-launch behavior, not a bug.

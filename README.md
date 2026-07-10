@@ -73,7 +73,7 @@ curl -X POST https://<your-domain>/api/admin/grant \
 - Email gate before the detailed readiness report
 - Supabase lead, diagnostic, event, payment-intent, purchase, entitlement, session, access-code, and issue-report storage
 - Founding/Pro checkout routing through a Gumroad hosted checkout link (interim provider), unlocked by verifying the buyer's Gumroad license key server-side at the Pro gate; Paddle's signature-verified webhook path stays wired for when Paddle clears merchant verification
-- Team/Cram routed through Wise + an admin-token-gated manual grant endpoint
+- Team/Cram routed by prefilled email to `nikhil211884@gmail.com`; the founder confirms manual payment and uses the admin-token-gated grant endpoint
 - Server-issued, revocable session tokens gate the Pro lab — no client-trusted flags
 - Paid scenarios served and graded server-side, one scenario at a time, tier-gated per plan (no answer key in page source, no cross-tier leakage)
 - Local analytics events and `dataLayer` hooks, plus server-fired payment/entitlement/refund events
@@ -85,7 +85,7 @@ curl -X POST https://<your-domain>/api/admin/grant \
 1. Set the Supabase, Gumroad, and admin/signing-secret variables in Vercel and run the end-to-end checks above, including a live Gumroad purchase (Paddle stays configured for the eventual flip-back).
 2. Remove or rotate any test access codes created in Supabase.
 3. The 300-scenario premium bank ships as `needs_sme_review` (structurally validated, not yet editorially approved) — a deliberate, accepted risk. Have a GH-600 subject-matter expert review it and flip a bad row's `review_status` to `'rejected'` to pull it from delivery immediately (no deploy needed).
-4. Privacy, terms, and refund routes are included; configure `support@gh600lab.com` routing before launch.
+4. Privacy, terms, and refund routes are included; Team/Cram and the public contact section route directly to `nikhil211884@gmail.com`.
 5. Add rate limiting / bot controls beyond the per-code lockout already in place (still open).
 
 ## Analytics events

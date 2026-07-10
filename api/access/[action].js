@@ -1,5 +1,5 @@
 // Consolidated access endpoints. One Vercel function serves
-// /api/access/verify and /api/access/session (dispatched on the last path
+// /api/access/verify, /api/access/session and /api/access/founding-count (dispatched on the last path
 // segment) to stay under the Hobby 12-function cap without changing any client
 // URL. Each handler is byte-for-byte the logic that previously lived in its
 // own file (api/access/verify.js, api/access/session.js).
@@ -7,6 +7,30 @@ import { handleError, HttpError, json, readJson, requireEmail, text } from "../_
 import { findActiveEntitlement, grantEntitlement, issueSession, redeemAccessCode, registerFailedCode, verifySession } from "../_lib/entitlements.js";
 import { resolvePlan } from "../_lib/plans.js";
 import { verifyGumroadLicense } from "../_lib/gumroad.js";
+import { select } from "../_lib/supabase.js";
+
+const FOUNDING_LIMIT = 100;
+
+export async function foundingCount() {
+  try {
+    const rows = await select("entitlements", {
+      select: "email",
+      plan: "eq.founding_access",
+      active: "eq.true"
+    });
+    const claimed = new Set(
+      rows.map(row => String(row.email || "").trim().toLowerCase()).filter(Boolean)
+    ).size;
+    return json({
+      ok: true,
+      claimed: Math.min(claimed, FOUNDING_LIMIT),
+      limit: FOUNDING_LIMIT,
+      source: "active_entitlements"
+    });
+  } catch (error) {
+    return handleError(error);
+  }
+}
 
 export async function verify(request) {
   try {
@@ -77,7 +101,7 @@ export async function session(request) {
   }
 }
 
-const handlers = { verify, session };
+const handlers = { verify, session, "founding-count": foundingCount };
 
 export async function POST(request) {
   const action = new URL(request.url).pathname.split("/").filter(Boolean).pop();

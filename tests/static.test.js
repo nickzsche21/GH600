@@ -12,12 +12,12 @@ const diagnosticUtils = readFileSync(resolve(root, "diagnostic-utils.js"), "utf8
 test("all local page assets exist", () => {
   const assets = [...html.matchAll(/(?:src|href)="([^"#?]+)"/g)]
     .map(match => match[1])
-    .filter(value => !/^https?:/.test(value));
+    .filter(value => !/^(?:https?:|mailto:)/.test(value));
   for (const asset of assets) assert.equal(existsSync(resolve(root, asset)), true, `${asset} should exist`);
 });
 
 test("backend config loads before the application", () => {
-  assert.ok(html.indexOf('src="backend-config.js"') < html.indexOf('src="app.js"'));
+  assert.ok(html.indexOf('src="backend-config.js"') < html.indexOf('src="app.js'));
 });
 
 test("legal pages are linked from the public site and exist", () => {
@@ -42,9 +42,18 @@ test("diagnostic answer positions are balanced instead of inheriting authored B-
 });
 
 test("front end calls every revenue endpoint", () => {
-  for (const route of ["/lead", "/event", "/diagnostic/complete", "/checkout-intent", "/access/verify", "/access/session", "/issue-report"]) {
+  for (const route of ["/lead", "/event", "/diagnostic/complete", "/checkout-intent", "/access/verify", "/access/session", "/access/founding-count", "/issue-report"]) {
     assert.match(app, new RegExp(route.replaceAll("/", "\\/")));
   }
+});
+
+test("team and cram offers route directly to the published support email", () => {
+  assert.match(html, /mailto:nikhil211884@gmail\.com\?subject=GH600%20Lab%20Team/);
+  assert.match(html, /mailto:nikhil211884@gmail\.com\?subject=GH600%20Lab%20urgent%20cram/);
+  assert.match(html, /id="contact"/);
+  assert.match(html, /No invented numbers/);
+  assert.doesNotMatch(html, /Manager readiness snapshot/);
+  assert.doesNotMatch(html, /Domain-level team gaps/);
 });
 
 test("server credential name is absent from browser assets", () => {

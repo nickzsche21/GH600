@@ -505,6 +505,55 @@ $$("#pricing [data-start-quiz]").forEach(button => button.addEventListener("clic
 $("#close-quiz").addEventListener("click", closeQuiz);
 quizDialog.addEventListener("cancel", e => { e.preventDefault(); closeQuiz(); });
 
+$$('[data-email-plan]').forEach(link => link.addEventListener("click", () => {
+  trackEvent("pricing_clicked", {
+    plan: link.dataset.emailPlan,
+    source: link.closest("#pricing") ? "pricing" : "contact"
+  });
+}));
+
+async function loadFoundingCount() {
+  const meter = $("#founding-meter");
+  if (!meter) return;
+
+  const claimedEl = $("#founding-claimed");
+  const progress = $("#founding-progress");
+  const progressBar = $("#founding-progress-bar");
+  const liveLabel = $("#founding-live-label");
+  const source = $("#founding-source");
+  const response = await apiRequest("/access/founding-count", {});
+
+  if (!response?.ok || !Number.isFinite(response.claimed) || !Number.isFinite(response.limit)) {
+    meter.classList.add("is-unavailable");
+    liveLabel.textContent = "Founding access open";
+    source.textContent = "Live count is temporarily unavailable. No estimate is shown.";
+    return;
+  }
+
+  const limit = Math.max(1, Math.round(response.limit));
+  const claimed = Math.min(limit, Math.max(0, Math.round(response.claimed)));
+  const percent = Math.min(100, claimed / limit * 100);
+  claimedEl.textContent = String(claimed);
+  claimedEl.nextElementSibling.textContent = `/ ${limit}`;
+  progressBar.style.width = `${percent}%`;
+  progress.setAttribute("aria-valuemax", String(limit));
+  progress.setAttribute("aria-valuenow", String(claimed));
+  progress.setAttribute("aria-valuetext", `${claimed} of ${limit} founding memberships activated`);
+  liveLabel.textContent = "Live from active members";
+  source.textContent = "Updates from activated founding access. No invented numbers.";
+
+  if (claimed >= limit) {
+    $("#founding-meter-title").textContent = "The founding allocation is full.";
+    $("#founding-count-label").textContent = "founding memberships activated";
+    $$('[data-open-access][data-plan="founder"]').forEach(button => {
+      button.disabled = true;
+      button.setAttribute("aria-disabled", "true");
+      button.textContent = "Founding access full";
+    });
+  }
+}
+void loadFoundingCount();
+
 const accessDialog = $("#access-dialog");
 function openAccess(plan = "founder") {
   $("#access-plan").value = plan;
@@ -513,10 +562,8 @@ function openAccess(plan = "founder") {
 }
 function updatePlanFields() {
   const plan = $("#access-plan").value;
-  $("#team-fields").hidden = plan !== "team";
-  $("#cram-fields").hidden = plan !== "cram";
   const action = $("#access-form button[type='submit']");
-  action.firstChild.textContent = plan === "team" ? "Reserve team pack " : plan === "cram" ? "Request cram slot " : plan === "pro" ? "Continue to Pro checkout " : "Continue to founding access ";
+  action.firstChild.textContent = plan === "pro" ? "Continue to Pro checkout " : "Continue to founding access ";
 }
 function closeAccess() { accessDialog.close(); }
 $$('[data-open-access]').forEach(button => button.addEventListener("click", () => {
@@ -534,15 +581,7 @@ $("#access-form").addEventListener("submit", async event => {
   trackEvent("checkout_started", { plan });
   const submit = event.submitter;
   if (submit) { submit.disabled = true; submit.firstChild.textContent = "Preparing checkout… "; }
-  const metadata = plan === "team" ? {
-    company: $("#team-company").value.trim(),
-    team_size: Number($("#team-size").value) || null,
-    message: $("#team-message").value.trim()
-  } : plan === "cram" ? {
-    preferred_time: $("#cram-time").value.trim(),
-    exam_date: $("#cram-exam-date").value,
-    weak_area: $("#cram-weak-area").value.trim()
-  } : {};
+  const metadata = {};
   await captureLead({ email, plan_interest: plan, source: "checkout_intent", metadata });
   trackEvent("email_captured", { source: "checkout_intent", plan });
   const intent = await apiRequest("/checkout-intent", { email, plan, source_page: `${window.location.pathname}${window.location.search}`, metadata });
@@ -555,7 +594,7 @@ $("#access-form").addEventListener("submit", async event => {
   closeAccess();
   event.target.reset();
   updatePlanFields();
-  showToast(plan === "team" || plan === "cram" ? "Request saved — I’ll follow up personally." : "Founding access reserved — checkout is being connected.");
+  showToast("Founding access reserved — checkout is being connected.");
   if (submit) submit.disabled = false;
 });
 
