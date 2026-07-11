@@ -659,10 +659,15 @@ function updatePlanFields() {
   action.firstChild.textContent = plan === "pro" ? "Continue to Pro checkout " : "Continue to founding access ";
 }
 function closeAccess() { accessDialog.close(); }
-$$('[data-open-access]').forEach(button => button.addEventListener("click", () => {
+$$('[data-open-access]').forEach(button => button.addEventListener("click", event => {
   const plan = button.dataset.plan || "founder";
-  trackEvent("pricing_clicked", { plan, source: button.closest("#pricing") ? "pricing" : "hero" });
-  if (plan === "founder") trackEvent("founding_access_clicked", { source: button.closest("#pricing") ? "pricing" : "hero" });
+  const source = button.closest("#pricing") ? "pricing" : "hero";
+  if (window.handleCheckout?.(plan, source)) {
+    event.preventDefault();
+    return;
+  }
+  trackEvent("pricing_clicked", { plan, source });
+  if (plan === "founder") trackEvent("founding_access_clicked", { source });
   openAccess(plan);
 }));
 $$('[data-close-access]').forEach(button => button.addEventListener("click", closeAccess));
