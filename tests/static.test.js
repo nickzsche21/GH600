@@ -8,6 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const html = readFileSync(resolve(root, "index.html"), "utf8");
 const app = readFileSync(resolve(root, "app.js"), "utf8");
 const diagnosticUtils = readFileSync(resolve(root, "diagnostic-utils.js"), "utf8");
+const css = readFileSync(resolve(root, "styles.css"), "utf8");
 
 test("all local page assets exist", () => {
   const assets = [...html.matchAll(/(?:src|href)="([^"#?]+)"/g)]
@@ -99,4 +100,42 @@ test("diagnostic and Pro-lab rendering escape server/authored content before it 
 test("Pro-lab scenario delivery distinguishes an exhausted mock from an expired/invalid session", () => {
   assert.match(app, /if \(response\?\.done\)/);
   assert.match(app, /function expireProLab/);
+});
+
+test("apiRequest bounds every request with an abortable timeout instead of hanging forever", () => {
+  assert.match(app, /new AbortController\(\)/);
+  assert.match(app, /controller\.abort\(\)/);
+  assert.match(app, /signal:\s*controller\.signal/);
+});
+
+test("loading primitives disable the button and mark it aria-busy/is-loading", () => {
+  assert.match(app, /function setButtonLoading\(button, text\)/);
+  assert.match(app, /function clearButtonLoading\(button\)/);
+  assert.match(app, /button\.disabled = true/);
+  assert.match(app, /button\.setAttribute\("aria-busy", "true"\)/);
+  assert.match(app, /button\.classList\.add\("is-loading"\)/);
+  assert.match(css, /\.button\.is-loading/);
+  assert.match(css, /prefers-reduced-motion: reduce[\s\S]*\.button\.is-loading::after \{ animation: none/);
+});
+
+test("every async click/submit path (A-F) routes through setButtonLoading", () => {
+  // A — [data-open-pro] across /access/session, with a re-entrancy guard
+  assert.match(app, /let proGateOpening = false;/);
+  assert.match(app, /openProGate\(button\)\s*\{\s*if \(proGateOpening\) return;/);
+  assert.match(app, /if \(button\) setButtonLoading\(button\)/);
+  // B — #pro-gate-form across /access/verify, with its own error element
+  assert.match(html, /<p id="pro-gate-error"/);
+  assert.match(app, /setButtonLoading\(submit, "Verifying…"\)/);
+  // C — #access-form across /lead then /checkout-intent, then the redirect
+  assert.match(app, /setButtonLoading\(submit, "Preparing checkout…"\)/);
+  assert.match(app, /Redirecting to checkout…/);
+  // D — [data-mock] tiles across /scenarios/progress then /scenarios/next, with a skeleton shell
+  assert.match(app, /startProLab\(button\.dataset\.mock, button\)/);
+  assert.match(app, /function quizSkeletonMarkup\(\)/);
+  assert.match(app, /quizBody\.innerHTML = quizSkeletonMarkup\(\)/);
+  // E — #mock-resume-restart across /scenarios/reset
+  assert.match(app, /setButtonLoading\(restartButton, "Restarting…"\)/);
+  // F — #issue-form and #report-email-form both fold into the same helper
+  const savingCalls = app.match(/setButtonLoading\(submit, "Saving…"\)/g) || [];
+  assert.equal(savingCalls.length, 2);
 });

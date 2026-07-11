@@ -80,6 +80,14 @@ Deep reference material for GH600 Lab (production deployed, paid tier active). `
   dashboard/token/product-id setup, the five `GUMROAD_*` env vars in
   Vercel, live purchase → license-key unlock verification checklist, and
   the deferred Phase 5 webhook work.
+- `plans/button-loading-states-2026-07-10.md` — **implemented.** Loading
+  states for the six click paths that `await` a fetch with no visual feedback
+  ("Member access", "Unlock Pro lab", "Continue to founding access", mock
+  picker, restart, issue form). Adds an `apiRequest` timeout so a stalled
+  fetch can't strand a disabled button, a `setButtonLoading` helper +
+  `.button.is-loading` CSS, and fixes the Pro-gate error branch clobbering
+  its own hint markup. Frontend only — no server, pricing, or entitlement
+  surface touched.
 
 Business strategy (pricing, positioning, kill criteria) lives at the repo
 root in `GH600-Lab-Launch-Plan.md`, not under `docs/` — referenced directly

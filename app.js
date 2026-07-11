@@ -70,20 +70,46 @@ const attribution = {
   utm_campaign: query.get("utm_campaign") || ""
 };
 
+const API_TIMEOUT_MS = 12000;
+
 async function apiRequest(path, payload) {
   if (!backend.enabled) return null;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
     const response = await fetch(`${backend.apiBase}${path}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: controller.signal
     });
     const data = await response.json().catch(() => ({ ok: false, error: "Unexpected server response" }));
     return response.ok ? data : { ...data, ok: false, status: response.status };
   } catch (error) {
     console.warn(`GH600 API ${path} unavailable`, error);
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
+}
+
+const buttonLoadingLabels = new WeakMap();
+function setButtonLoading(button, text) {
+  if (!button || buttonLoadingLabels.has(button)) return;
+  buttonLoadingLabels.set(button, button.firstChild?.textContent ?? "");
+  if (text && button.firstChild) button.firstChild.textContent = text;
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  button.classList.add("is-loading");
+}
+function clearButtonLoading(button) {
+  if (!button || !buttonLoadingLabels.has(button)) return;
+  const label = buttonLoadingLabels.get(button);
+  if (button.firstChild) button.firstChild.textContent = label;
+  buttonLoadingLabels.delete(button);
+  button.disabled = false;
+  button.removeAttribute("aria-busy");
+  button.classList.remove("is-loading");
 }
 
 function trackEvent(name, properties = {}) {
@@ -302,25 +328,55 @@ async function fetchPlanProgress() {
 const mockResumeDialog = $("#mock-resume-dialog");
 $$('[data-close-mock-resume]').forEach(button => button.addEventListener("click", () => mockResumeDialog.close()));
 
-async function startProLab(mockId) {
-  planProgress = await fetchPlanProgress();
-  const bucket = planProgress.mocks[mockId] || { completed: 0, total: 0 };
-  if (bucket.completed > 0) {
-    $("#mock-resume-heading").textContent = `${MOCK_LABELS[mockId] || "This mock"} is ${bucket.completed >= bucket.total ? "complete" : "in progress"}.`;
-    $("#mock-resume-copy").textContent = `You've answered ${bucket.completed} of ${bucket.total} questions here. Continue where you left off, or restart from scratch.`;
-    $("#mock-resume-continue").onclick = () => { mockResumeDialog.close(); beginProLabRun(mockId); };
-    $("#mock-resume-restart").onclick = async () => {
-      mockResumeDialog.close();
-      const token = localStorage.getItem("gh600lab-session-token") || "";
-      await apiRequest("/scenarios/reset", { token, session_id: sessionId, mock_id: mockId });
-      if (mockId !== "DRILL") planProgress.core.completed = Math.max(0, planProgress.core.completed - bucket.completed);
-      planProgress.mocks[mockId] = { ...bucket, completed: 0 };
-      beginProLabRun(mockId);
-    };
-    mockResumeDialog.showModal();
-    return;
+async function startProLab(mockId, button) {
+  if (button) setButtonLoading(button);
+  try {
+    planProgress = await fetchPlanProgress();
+    const bucket = planProgress.mocks[mockId] || { completed: 0, total: 0 };
+    if (bucket.completed > 0) {
+      proAreaDialog.close();
+      $("#mock-resume-heading").textContent = `${MOCK_LABELS[mockId] || "This mock"} is ${bucket.completed >= bucket.total ? "complete" : "in progress"}.`;
+      $("#mock-resume-copy").textContent = `You've answered ${bucket.completed} of ${bucket.total} questions here. Continue where you left off, or restart from scratch.`;
+      $("#mock-resume-continue").onclick = () => { mockResumeDialog.close(); beginProLabRun(mockId); };
+      $("#mock-resume-restart").onclick = async () => {
+        const restartButton = $("#mock-resume-restart");
+        setButtonLoading(restartButton, "Restarting…");
+        try {
+          const token = localStorage.getItem("gh600lab-session-token") || "";
+          await apiRequest("/scenarios/reset", { token, session_id: sessionId, mock_id: mockId });
+          if (mockId !== "DRILL") planProgress.core.completed = Math.max(0, planProgress.core.completed - bucket.completed);
+          planProgress.mocks[mockId] = { ...bucket, completed: 0 };
+          mockResumeDialog.close();
+          beginProLabRun(mockId);
+        } finally {
+          clearButtonLoading(restartButton);
+        }
+      };
+      mockResumeDialog.showModal();
+      return;
+    }
+    beginProLabRun(mockId);
+  } finally {
+    if (button) clearButtonLoading(button);
   }
-  beginProLabRun(mockId);
+}
+
+function quizSkeletonMarkup() {
+  return `
+    <section class="quiz-question quiz-skeleton">
+      <aside class="quiz-sidebar">
+        <div class="skeleton-block" style="width:70%;height:18px"></div>
+        <div class="skeleton-block" style="width:90%;height:56px"></div>
+        <div class="skeleton-block" style="width:50%;height:34px"></div>
+      </aside>
+      <div class="question-main">
+        <div class="skeleton-block" style="width:40%;height:14px"></div>
+        <div class="skeleton-block" style="width:100%;height:80px"></div>
+        <div class="skeleton-block" style="width:100%;height:48px"></div>
+        <div class="skeleton-block" style="width:100%;height:48px"></div>
+        <div class="skeleton-block" style="width:100%;height:48px"></div>
+      </div>
+    </section>`;
 }
 
 function beginProLabRun(mockId) {
@@ -335,6 +391,8 @@ function beginProLabRun(mockId) {
     if (timerEl) timerEl.textContent = formatTime(timer);
     if (timer === 0) finishProLab();
   }, 1000);
+  proAreaDialog.close();
+  quizBody.innerHTML = quizSkeletonMarkup();
   if (!quizDialog.open) quizDialog.showModal();
   document.body.style.overflow = "hidden";
   renderNextProScenario();
@@ -448,8 +506,8 @@ function expireProLab() {
   clearInterval(timerId);
   closeQuiz();
   localStorage.removeItem("gh600lab-session-token");
-  const message = $("#pro-gate-message");
-  if (message) message.textContent = "Your session expired — please re-enter your email and license key.";
+  const errorEl = $("#pro-gate-error");
+  if (errorEl) errorEl.textContent = "Your session expired — please re-enter your email and license key.";
   proGateDialog.showModal();
 }
 
@@ -462,15 +520,19 @@ function renderReportGate(result) {
   $("#report-email-form").addEventListener("submit", async event => {
     event.preventDefault();
     const email = $("#report-email").value.trim();
-    const submit = event.submitter;
-    if (submit) { submit.disabled = true; submit.textContent = "Saving…"; }
-    saveLocalRecord("gh600lab-report-leads", { email, score: result.score, source: "diagnostic_report" });
-    await captureLead({ email, current_score: result.score, source: "diagnostic_report", plan_interest: "founder" });
-    if (result.attemptRequest) await result.attemptRequest;
-    await apiRequest("/diagnostic/complete", { ...diagnosticPayload(result, email), attempt_id: result.attemptId });
-    localStorage.setItem("gh600lab-report-email", email);
-    trackEvent("email_captured", { source: "diagnostic_report", score: result.score });
-    renderDetailedReport(result);
+    const submit = event.submitter || event.target.querySelector("button[type=submit]");
+    setButtonLoading(submit, "Saving…");
+    try {
+      saveLocalRecord("gh600lab-report-leads", { email, score: result.score, source: "diagnostic_report" });
+      await captureLead({ email, current_score: result.score, source: "diagnostic_report", plan_interest: "founder" });
+      if (result.attemptRequest) await result.attemptRequest;
+      await apiRequest("/diagnostic/complete", { ...diagnosticPayload(result, email), attempt_id: result.attemptId });
+      localStorage.setItem("gh600lab-report-email", email);
+      trackEvent("email_captured", { source: "diagnostic_report", score: result.score });
+      renderDetailedReport(result);
+    } finally {
+      clearButtonLoading(submit);
+    }
   });
 }
 
@@ -532,31 +594,37 @@ $("#access-form").addEventListener("submit", async event => {
   const email = $("#access-email").value.trim();
   const plan = $("#access-plan").value;
   trackEvent("checkout_started", { plan });
-  const submit = event.submitter;
-  if (submit) { submit.disabled = true; submit.firstChild.textContent = "Preparing checkout… "; }
-  const metadata = plan === "team" ? {
-    company: $("#team-company").value.trim(),
-    team_size: Number($("#team-size").value) || null,
-    message: $("#team-message").value.trim()
-  } : plan === "cram" ? {
-    preferred_time: $("#cram-time").value.trim(),
-    exam_date: $("#cram-exam-date").value,
-    weak_area: $("#cram-weak-area").value.trim()
-  } : {};
-  await captureLead({ email, plan_interest: plan, source: "checkout_intent", metadata });
-  trackEvent("email_captured", { source: "checkout_intent", plan });
-  const intent = await apiRequest("/checkout-intent", { email, plan, source_page: `${window.location.pathname}${window.location.search}`, metadata });
-  const checkoutUrl = intent?.redirect_url || window.GH600_CHECKOUT?.[plan];
-  if (checkoutUrl) {
-    trackEvent("checkout_redirected", { plan, provider: intent?.provider || "local_config" });
-    window.location.assign(checkoutUrl);
-    return;
+  const submit = event.submitter || event.target.querySelector("button[type=submit]");
+  setButtonLoading(submit, "Preparing checkout…");
+  let redirected = false;
+  try {
+    const metadata = plan === "team" ? {
+      company: $("#team-company").value.trim(),
+      team_size: Number($("#team-size").value) || null,
+      message: $("#team-message").value.trim()
+    } : plan === "cram" ? {
+      preferred_time: $("#cram-time").value.trim(),
+      exam_date: $("#cram-exam-date").value,
+      weak_area: $("#cram-weak-area").value.trim()
+    } : {};
+    await captureLead({ email, plan_interest: plan, source: "checkout_intent", metadata });
+    trackEvent("email_captured", { source: "checkout_intent", plan });
+    const intent = await apiRequest("/checkout-intent", { email, plan, source_page: `${window.location.pathname}${window.location.search}`, metadata });
+    const checkoutUrl = intent?.redirect_url || window.GH600_CHECKOUT?.[plan];
+    if (checkoutUrl) {
+      trackEvent("checkout_redirected", { plan, provider: intent?.provider || "local_config" });
+      if (submit?.firstChild) submit.firstChild.textContent = "Redirecting to checkout…";
+      redirected = true;
+      window.location.assign(checkoutUrl);
+      return;
+    }
+    closeAccess();
+    event.target.reset();
+    updatePlanFields();
+    showToast(plan === "team" || plan === "cram" ? "Request saved — I’ll follow up personally." : "Founding access reserved — checkout is being connected.");
+  } finally {
+    if (!redirected) clearButtonLoading(submit);
   }
-  closeAccess();
-  event.target.reset();
-  updatePlanFields();
-  showToast(plan === "team" || plan === "cram" ? "Request saved — I’ll follow up personally." : "Founding access reserved — checkout is being connected.");
-  if (submit) submit.disabled = false;
 });
 
 const proGateDialog = $("#pro-gate-dialog");
@@ -572,10 +640,7 @@ function renderMockPicker(plan) {
     : `${mockCount} mock exams are unlocked.`;
   $("#mock-picker").innerHTML = mocks.map(mockId => `<button class="button button-outline-light" data-mock="${mockId}">${MOCK_LABELS[mockId]} <span>→</span></button>`).join("")
     || `<p>No mock exams are included on this plan yet.</p>`;
-  $$("[data-mock]", $("#mock-picker")).forEach(button => button.addEventListener("click", () => {
-    proAreaDialog.close();
-    startProLab(button.dataset.mock);
-  }));
+  $$("[data-mock]", $("#mock-picker")).forEach(button => button.addEventListener("click", () => startProLab(button.dataset.mock, button)));
   fetchPlanProgress().then(progress => {
     $$("[data-mock]", $("#mock-picker")).forEach(button => {
       const mockId = button.dataset.mock;
@@ -587,16 +652,24 @@ function renderMockPicker(plan) {
   });
 }
 
-async function openProGate() {
+let proGateOpening = false;
+async function openProGate(button) {
+  if (proGateOpening) return;
   const token = localStorage.getItem("gh600lab-session-token");
-  if (token) {
+  if (!token) { proGateDialog.showModal(); return; }
+  proGateOpening = true;
+  if (button) setButtonLoading(button);
+  try {
     const response = await apiRequest("/access/session", { token });
     if (response?.ok) { renderMockPicker(response.plan); proAreaDialog.showModal(); return; }
     localStorage.removeItem("gh600lab-session-token");
+    proGateDialog.showModal();
+  } finally {
+    proGateOpening = false;
+    if (button) clearButtonLoading(button);
   }
-  proGateDialog.showModal();
 }
-$$('[data-open-pro]').forEach(button => button.addEventListener("click", openProGate));
+$$('[data-open-pro]').forEach(button => button.addEventListener("click", () => openProGate(button)));
 $$('[data-close-pro]').forEach(button => button.addEventListener("click", () => proGateDialog.close()));
 $$('[data-close-pro-area]').forEach(button => button.addEventListener("click", () => proAreaDialog.close()));
 $("#pro-gate-form").addEventListener("submit", async event => {
@@ -604,18 +677,26 @@ $("#pro-gate-form").addEventListener("submit", async event => {
   const email = $("#pro-email").value.trim().toLowerCase();
   const code = $("#pro-code").value.trim().toUpperCase();
   trackEvent("pro_gate_attempted", { has_email: Boolean(email), code_length: code.length });
-  const remote = await apiRequest("/access/verify", { email, code });
-  if (!remote?.ok) {
-    $("#pro-gate-message").textContent = "That email/license key pair isn't active — check the key from your Gumroad receipt.";
-    return;
+  const submit = event.submitter || event.target.querySelector("button[type=submit]");
+  const errorEl = $("#pro-gate-error");
+  errorEl.textContent = "";
+  setButtonLoading(submit, "Verifying…");
+  try {
+    const remote = await apiRequest("/access/verify", { email, code });
+    if (!remote?.ok) {
+      errorEl.textContent = "That email/license key pair isn't active — check the key from your Gumroad receipt.";
+      return;
+    }
+    localStorage.setItem("gh600lab-session-token", remote.token);
+    localStorage.setItem("gh600lab-pro-email", email);
+    localStorage.setItem("gh600lab-known-email", email);
+    trackEvent("pro_gate_unlocked", { plan: remote.plan });
+    proGateDialog.close();
+    renderMockPicker(remote.plan);
+    proAreaDialog.showModal();
+  } finally {
+    clearButtonLoading(submit);
   }
-  localStorage.setItem("gh600lab-session-token", remote.token);
-  localStorage.setItem("gh600lab-pro-email", email);
-  localStorage.setItem("gh600lab-known-email", email);
-  trackEvent("pro_gate_unlocked", { plan: remote.plan });
-  proGateDialog.close();
-  renderMockPicker(remote.plan);
-  proAreaDialog.showModal();
 });
 
 const issueDialog = $("#issue-dialog");
@@ -624,12 +705,18 @@ $$('[data-close-issue]').forEach(button => button.addEventListener("click", () =
 $("#issue-form").addEventListener("submit", async event => {
   event.preventDefault();
   const report = { email: $("#issue-email").value.trim(), message: $("#issue-text").value.trim(), path: `${window.location.pathname}${window.location.search}`, session_id: sessionId };
-  saveLocalRecord("gh600lab-issues", report);
-  await apiRequest("/issue-report", report);
-  trackEvent("issue_reported", { path: report.path });
-  issueDialog.close();
-  event.target.reset();
-  showToast("Issue saved — thank you for improving the lab.");
+  const submit = event.submitter || event.target.querySelector("button[type=submit]");
+  setButtonLoading(submit, "Saving…");
+  try {
+    saveLocalRecord("gh600lab-issues", report);
+    await apiRequest("/issue-report", report);
+    trackEvent("issue_reported", { path: report.path });
+    issueDialog.close();
+    event.target.reset();
+    showToast("Issue saved — thank you for improving the lab.");
+  } finally {
+    clearButtonLoading(submit);
+  }
 });
 
 function showToast(message) {

@@ -335,6 +335,8 @@ dialog::backdrop { background: rgba(12, 16, 13, .75); backdrop-filter: blur(8px)
 .important-note { display: flex; gap: 10px; align-items: flex-start; padding: 13px 14px; margin-top: 16px; background: rgba(200, 255, 71, .08); border: 1px solid rgba(200, 255, 71, .25); border-radius: 8px; }
 .important-asterisk { color: var(--coral); font-weight: 800; font-size: 16px; margin-top: -1px; }
 .important-note p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.pro-gate-error { margin: 12px 0 0; color: var(--coral); font-size: 12px; line-height: 1.5; }
+.pro-gate-error:empty { display: none; }
 .pro-modal { width: min(620px, calc(100% - 32px)); border-radius: 17px; padding: 42px; background: var(--ink); color: white; box-shadow: var(--shadow); }
 .pro-modal .modal-close { color: white; border-color: rgba(255,255,255,.18); }
 .pro-modal h2 { margin: 17px 0 9px; font-size: 40px; line-height: 1.05; letter-spacing: -.06em; }
@@ -439,6 +441,27 @@ dialog::backdrop { background: rgba(12, 16, 13, .75); backdrop-filter: blur(8px)
   .result-domain { grid-template-columns: 120px 1fr 32px; }
 }
 
+@keyframes gh600-shimmer { 0% { background-position: -120% 0; } 100% { background-position: 120% 0; } }
+.skeleton-block { border-radius: 8px; margin-bottom: 14px; background: linear-gradient(90deg, var(--line) 25%, rgba(18,23,19,.06) 50%, var(--line) 75%); background-size: 200% 100%; animation: gh600-shimmer 1.4s ease-in-out infinite; }
+.quiz-skeleton .quiz-sidebar .skeleton-block:last-child,
+.quiz-skeleton .question-main .skeleton-block:last-child { margin-bottom: 0; }
+
+@keyframes gh600-spin { to { transform: rotate(360deg); } }
+.button.is-loading { pointer-events: none; opacity: .72; }
+.button.is-loading > span { display: none; }
+.button.is-loading::after {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  opacity: .6;
+  animation: gh600-spin .6s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+  .button.is-loading::after { animation: none; border-style: dashed; }
+  .skeleton-block { animation: none; background: var(--line); }
 }
