@@ -3,8 +3,9 @@
 Funnel (also stated in root `README.md`):
 
 ```
-landing → diagnostic → email-gated report → plan form → server-owned price
-→ (Gumroad hosted checkout | Wise invoice) → license key | admin grant
+landing → diagnostic → email-gated report → plan choice
+→ (Gumroad hosted checkout | direct Team/Cram email → manual invoice)
+→ license key | admin grant
 → server-issued entitlement + session token → Pro lab (server-graded)
 ```
 
@@ -57,6 +58,10 @@ Never in `app.js` or any `*-config.js` file. `api/_lib/plans.js` is the
 single source of plan id/label/amount/currency/provider/env-var-name;
 every plan change starts there. See `docs/engineering/api-contracts.md` →
 `/api/checkout-intent`.
+
+The public Team and Cram CTAs intentionally use prefilled `mailto:` links to
+`nikhil211884@gmail.com`. Those offers are manually scoped and delivered; the
+Wise/admin-grant backend remains available after the founder confirms payment.
 
 ## Business strategy
 

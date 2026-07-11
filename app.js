@@ -10,49 +10,142 @@ const domains = [
 ];
 
 const questions = [
-  { d:1, objective:"Define planning and action boundaries", artifact:{name:"agent-policy.yml",code:`mode: autonomous
-plan:
-  output: false
-  approval_before_action: false
-execution:
-  target_branch: main`}, q:"A coding agent receives an issue and immediately edits the default branch before a maintainer sees its approach. The team wants speed but must prevent unreviewed architectural changes. What is the best first control?", a:["Require the agent to output a structured plan and block execution until that plan is approved","Shorten the issue template so the agent starts faster","Give the agent a larger context window","Run the same agent twice and compare the commits"], c:0, why:"Separating planning from execution creates a meaningful review gate before action. The plan must be structured and validated; more context or duplicate runs do not prevent an unsafe edit." },
-  { d:1, objective:"Define measurable success criteria", q:"An agent closes dependency-update issues whenever the build passes, but some releases still break at runtime. Which task definition most improves its success criteria?", a:["Success means the pull request was created","Success means CI, targeted integration tests, and the deployment smoke check all pass","Success means the agent used fewer than ten tool calls","Success means a reviewer reacted with an emoji"], c:1, why:"Success criteria should reflect the development intent and operational outcome. A build alone is an incomplete proxy when runtime behavior matters." },
-  { d:1, objective:"Produce inspectable artifacts", q:"A security team cannot reconstruct why an autonomous refactor changed an authorization rule. Which workflow change gives the strongest observability without stopping automation?", a:["Record the agent's plan, tool calls, diffs, test results, and approval in the pull request","Ask the agent to explain itself only if a bug is reported","Save the final chat transcript on a developer laptop","Disable autonomous refactoring entirely"], c:0, why:"Standard development artifacts—especially the pull request—should carry the plan, evidence, changes, and approval so the action remains inspectable and auditable." },
-  { d:2, objective:"Configure least-privilege tool access", artifact:{name:"mcp.json",code:`{
-  "repositories": ["*"],
-  "permissions": ["repo:admin", "org:admin"],
-  "allowed_actions": ["read", "pull_request"]
-}`}, q:"A documentation agent only needs to read source files and open pull requests, but its MCP token can administer repositories. What should you do?", a:["Keep admin access because the agent is trusted","Scope the token to required repositories and only the read-content/create-PR permissions","Hide the token value in the system prompt","Add a second admin token for failover"], c:1, why:"Tool permissions should be scoped to the minimum actions and repositories required. Secret placement does not compensate for excessive authorization." },
-  { d:2, objective:"Implement safe retries", q:"A deployment tool times out after sending a release request. The agent retries and occasionally creates two releases. What should the workflow implement first?", a:["A higher retry limit","An idempotency key plus state verification before retrying","A larger model","A second deployment agent"], c:1, why:"When the outcome is uncertain, retrying blindly is unsafe. Idempotency and state verification make repeated calls deterministic and prevent duplicate side effects." },
-  { d:2, objective:"Scope execution environment", q:"An agent must fix a bug in one repository but its credentials can create branches across the entire organization. Which setup best contains the blast radius?", a:["Repository-scoped credentials, an isolated branch, and a pull-request-only path","Organization admin access with detailed logging","A global token that expires in one year","Direct pushes with branch names prefixed by agent/"], c:0, why:"Repository scope, branch isolation, and a reviewed PR path constrain both permission and execution context. Naming conventions and logging alone do not reduce authority." },
-  { d:3, objective:"Choose an appropriate memory strategy", artifact:{name:"memory-record.json",code:`{
-  "customer": "acme-42",
-  "fact": "Approved exception",
-  "scope": "global",
-  "expires_at": null
-}`}, q:"A triage agent must remember a customer's approved exception for 90 days across sessions, but unrelated customers must never influence each other. Which design fits?", a:["Keep all conversations in one long prompt","Use external, customer-scoped memory with an expiration rule","Store the exception in the model's system prompt","Rely on short-term conversation memory"], c:1, why:"The fact must persist across sessions, so short-term memory is insufficient. External memory should be scoped per customer and expire with the policy." },
-  { d:3, objective:"Resume from durable state", q:"A long-running migration agent crashes after completing 73 of 100 repositories. How should it resume safely?", a:["Restart from repository one to verify everything","Load a durable checkpoint of completed work and verify the next pending repository","Ask the model to remember where it stopped","Infer progress from the current chat length"], c:1, why:"Durable checkpoints preserve progress and decisions outside transient context. Verification before the next action limits drift and repeated work." },
-  { d:3, objective:"Prevent stale context", q:"An agent keeps recommending a retired deployment procedure because it remains in long-term memory. What is the best memory control?", a:["Increase retrieval top-k","Add provenance, freshness metadata, and pruning rules to memory","Copy the old procedure into every prompt","Disable all external memory"], c:1, why:"Persistent memory needs lifecycle controls. Provenance and freshness allow stale items to be detected, while pruning or expiration removes them intentionally." },
-  { d:4, objective:"Select meaningful evaluation signals", artifact:{name:"evaluation.log",code:`build_passed=true
-syntax_errors=0
-acceptance_criteria_checked=false
-review_findings=7
-rollback_within_24h=true`}, q:"A pull-request agent produces syntactically valid patches that often misunderstand the issue. Which evaluation set is most useful?", a:["Token count and response length only","Issue acceptance criteria, relevant test outcomes, review findings, and rollback rate","Number of comments in the pull request","Average branch-name length"], c:1, why:"Evaluation must connect development intent with quality and operational outcomes. Cost metrics can supplement—but cannot replace—correctness and reliability signals." },
-  { d:4, objective:"Classify root causes", q:"An agent chose the right remediation but called a production tool with a malformed parameter. Logs show its reasoning and retrieved context were correct. How should the failure be classified?", a:["Reasoning failure","Tool misuse or interface failure","Memory drift","Multi-agent conflict"], c:1, why:"The decision was correct and context was sound; the failure occurred at tool invocation. Correct classification prevents unnecessary prompt or memory changes." },
-  { d:4, objective:"Tune from evidence", q:"Evaluation traces show an agent succeeds until retrieved documents exceed the context budget, after which it ignores the latest policy. What is the best tuning move?", a:["Make the system prompt longer","Improve retrieval filtering and context prioritization, then rerun the evaluation","Increase agent autonomy","Add more unrelated examples"], c:1, why:"The evidence identifies context overload. Selective retrieval and prioritization address that root cause; additional prompt content would worsen it." },
-  { d:5, objective:"Isolate parallel execution", artifact:{name:"orchestrator.yml",code:`agents: [security-fix, dependency-fix]
-workspace: /tmp/shared
+  { d:1, objective:"Define planning and action boundaries", artifact:{name:"agent_run_policy.yml",code:`trigger: issue_labeled
+allowed_scope:
+  paths: ["services/billing/**", ".github/workflows/**"]
+planner:
+  emits_plan: true
+executor:
+  may_edit_before_approval: true
+  target_branch: main
+change_risk:
+  authz_rules: high
+  ci_only: insufficient`}, q:"A coding agent is triggered from an issue label. Its plan mentions an authorization-rule change, but the policy lets it edit `main` before approval. The team wants autonomous bug fixes to stay fast while preventing unreviewed architectural/security changes. What is the best control?", a:["Require a signed structured plan and block high-risk path/rule changes until a maintainer approves the plan","Keep the policy unchanged but require the agent to paste its reasoning into the issue after it commits","Allow edits only when the issue has fewer than three acceptance criteria","Run a second agent after the commit and compare whether both changed the same files"], c:0, why:"The risk is not that the agent lacks a plan; it is that execution is allowed before approval for high-risk changes. A plan gate tied to change class prevents unsafe edits while preserving autonomy for lower-risk work." },
+  { d:1, objective:"Define measurable success criteria", artifact:{name:"issue_acceptance.md",code:`Goal: upgrade payment SDK
+Done when:
+- build passes
+- no lint errors
+Recent incident:
+- checkout returned 200
+- webhook signature verification failed in production
+- paid users were not entitled`}, q:"The agent closes SDK-upgrade issues once build and lint pass, but the last release broke paid access because webhook verification was not exercised. Which revised success definition is strongest?", a:["The pull request is open, build passes, and the agent used fewer than 20 tool calls","Build, lint, targeted webhook tests, entitlement creation, and a checkout smoke path all pass before closure","The agent includes a confidence score above 80 percent in the final message","A reviewer leaves any comment on the pull request before merge"], c:1, why:"Good success criteria represent the actual user and system outcome. Here, checkout and entitlement behavior are part of success; build and lint are necessary but too shallow." },
+  { d:1, objective:"Produce inspectable artifacts", artifact:{name:"pr_evidence.txt",code:`Agent final note:
+Changed auth guard to reduce friction.
+
+Missing:
+- original plan
+- tool calls
+- diff rationale
+- test evidence
+- human approval record`}, q:"A security reviewer cannot reconstruct why an autonomous refactor relaxed an authorization guard. The team still wants agents to create pull requests. Which workflow change gives the strongest inspectability?", a:["Attach the plan, tool transcript summary, diff rationale, test evidence, risk notes, and approvals to the pull request","Ask the agent to save its full private conversation locally for audit requests","Require the final commit message to say whether the model felt confident","Disable all agent refactors involving security-sensitive code"], c:0, why:"The pull request should become the auditable package: intent, evidence, changes, and approvals. Local transcripts or confidence statements do not create reliable review artifacts." },
+  { d:2, objective:"Configure least-privilege tool access", artifact:{name:"mcp_tools.json",code:`{
+  "task": "update docs and open a PR",
+  "servers": {
+    "github": {
+      "repositories": ["*"],
+      "tools": ["contents.read", "contents.write", "pull_requests.write", "actions.write", "members.write"],
+      "token_ttl": "30d"
+    }
+  }
+}`}, q:"A documentation agent only needs to read repository content and open pull requests in one docs repository. The current MCP configuration exposes organization-wide write and membership tools. Which correction best reduces risk without blocking the task?", a:["Move the token into an environment variable but leave the tool list unchanged","Restrict the server to the docs repository, allow content read plus pull request creation, remove Actions and membership tools, and shorten token lifetime","Keep organization-wide tools but tell the agent in the prompt not to use them","Add an audit log and let the same token continue to administer organization membership"], c:1, why:"Least privilege must be enforced in the tool boundary, not only in prompting or secret storage. Repository, action, and lifetime scope all matter for MCP-style tool access." },
+  { d:2, objective:"Implement safe retries", artifact:{name:"release_trace.log",code:`10:02:11 POST /releases request_id=rel-884 timeout
+10:02:42 retry POST /releases request_id=rel-991 201
+10:03:18 webhook received for rel-884 201
+10:04:03 duplicate release detected`}, q:"A deployment agent retries after a timeout and sometimes creates duplicate releases. The release API supports idempotency keys and a status lookup endpoint. What should the workflow do first?", a:["Increase timeout and retry up to five times because the first call usually fails","Use one idempotency key per intended release, check release state after uncertain outcomes, and retry only when state is absent or failed","Ask a second model to decide whether the timeout probably succeeded","Disable retries and require a human to manually re-run every timeout"], c:1, why:"Timeout means the outcome is unknown, not failed. Idempotency plus state verification prevents duplicate side effects while keeping recovery automated." },
+  { d:2, objective:"Scope execution environment", artifact:{name:"runner_context.yml",code:`job: fix-gh600-bug
+checkout: org/*
+token_scopes:
+  - contents:write
+  - workflows:write
+  - administration:write
+branch_protection_bypass: true
+network: unrestricted`}, q:"An agent is assigned a one-repository UI bug, but its runner can edit any org repository, rewrite workflows, bypass branch protection, and access unrestricted network. Which setup best contains blast radius?", a:["Keep the runner as-is, but require the agent to mention the target repository in its final answer","Use a repository-scoped token, isolated branch/workspace, pull-request-only writes, branch protection, and allowlisted network egress","Let the agent push directly as long as the branch name starts with `agent/`","Give the agent admin rights only during business hours"], c:1, why:"Containment requires enforced boundaries around repository access, write path, branch rules, and environment capabilities. Naming and time windows do not meaningfully reduce authority." },
+  { d:3, objective:"Choose an appropriate memory strategy", artifact:{name:"memory_record.json",code:`{
+  "tenant": "global",
+  "subject": "Acme refund exception",
+  "value": "Refund approval limit raised to $5000",
+  "source": "support chat",
+  "expires_at": null,
+  "applies_to": ["all_customers"]
+}`}, q:"A support agent must remember Acme's temporary refund exception for 90 days, but the saved memory is global and has no expiry. What is the best correction?", a:["Move the exception into a longer system prompt so every run sees it","Store it as tenant-scoped durable memory with source, expiry, and retrieval filters that prevent cross-customer use","Keep it global because the exception may help other customers with similar problems","Delete all durable memory and rely only on the current conversation"], c:1, why:"The requirement is durable but isolated memory. Scope, provenance, expiry, and retrieval rules prevent one customer's exception from contaminating unrelated decisions." },
+  { d:3, objective:"Resume from durable state", artifact:{name:"migration_checkpoint.json",code:`{
+  "run_id": "mig-2026-07-10",
+  "completed_repos": 73,
+  "last_repo": "api-gateway",
+  "pending": ["billing-api", "web-app"],
+  "last_verified_hash": "9f21",
+  "chat_context_available": false
+}`}, q:"A migration agent crashed after completing 73 repositories. Some repositories have side effects outside Git. How should it resume safely?", a:["Restart from repository one and repeat every action to guarantee consistency","Load the durable checkpoint, verify recorded side effects for the last completed item, then continue with the next pending repository","Ask the model to infer progress from the issue comments and continue from its best guess","Skip verification because the checkpoint says 73 repositories are complete"], c:1, why:"Durable state is the right source of progress, but it should be verified at the boundary before new side effects. Guessing from chat or blindly replaying work is unsafe." },
+  { d:3, objective:"Prevent stale context", artifact:{name:"retrieval_result.txt",code:`selected_memory:
+- title: Deploy via Classic Release
+  updated_at: 2024-02-03
+  superseded_by: GitHub Actions deploy v3
+  confidence: high
+current_policy:
+- Actions deploy v3 required for production`}, q:"An agent keeps recommending a retired deployment procedure because its old memory has high confidence. Which memory control addresses the root cause?", a:["Increase the number of retrieved memories so newer items might appear too","Use provenance, freshness, supersession metadata, and pruning/expiry rules during retrieval","Copy both the old and new deployment procedures into every prompt","Disable retrieval for all production tasks"], c:1, why:"The failure is stale retrieval, not lack of context. Freshness and supersession metadata let the system demote or prune obsolete memory before it influences a recommendation." },
+  { d:4, objective:"Select meaningful evaluation signals", artifact:{name:"eval_summary.csv",code:`metric,value
+build_pass_rate,0.98
+acceptance_criteria_verified,0.41
+review_rework_rate,0.37
+rollback_24h_rate,0.18
+avg_tokens,11200`}, q:"A pull-request agent has a high build pass rate but frequently misunderstands the issue and causes rework. Which evaluation bundle is most useful for tuning?", a:["Average token count, model latency, and number of files opened","Acceptance-criteria coverage, targeted test results, review rework, rollback rate, and trace examples for misses","Number of pull request comments and branch-name length","Only build pass rate, because failing builds are the clearest signal"], c:1, why:"Build pass rate is too narrow. The useful bundle connects intent, evidence, human review, operational fallout, and concrete traces that explain failures." },
+  { d:4, objective:"Classify root causes", artifact:{name:"failure_trace.log",code:`retrieved_policy=correct
+plan=rotate staging key only
+tool_call=rotate_secret(env="prod", key="stripe_live")
+tool_schema_required_env=["staging","prod"]
+review=reasoning matched policy; parameter was wrong`}, q:"The agent understood the policy and planned a staging-only rotation, but called the tool with `env=\"prod\"`. How should this failure be classified first?", a:["Reasoning failure, because any bad action means the plan was wrong","Tool invocation or interface-control failure, because the chosen parameter violated the otherwise correct plan","Memory drift, because the agent must have remembered an old secret policy","Multi-agent coordination failure, because another reviewer should have caught it"], c:1, why:"The trace shows correct retrieval and planning, with the error introduced at tool-call construction. Classification matters because the fix should target schema validation or action checks, not memory or reasoning." },
+  { d:4, objective:"Tune from evidence", artifact:{name:"trace_pattern.txt",code:`pass cases: retrieved_docs <= 6
+fail cases: retrieved_docs >= 18
+observed behavior:
+- newest policy ranked 14th
+- answer cites older policy
+- tests chosen from unrelated package`}, q:"Evaluation traces show the agent fails when retrieval floods the context and pushes the newest policy below the useful window. What is the best tuning move?", a:["Make the system prompt longer so the agent is reminded to read everything","Improve retrieval filtering/ranking, cap low-value context, prioritize fresh policy, and rerun the same evaluation set","Increase autonomy so the agent can decide which policy to follow after acting","Add more few-shot examples even if they consume additional context"], c:1, why:"The evidence points to context selection failure. Better retrieval and prioritization address the failure mode directly; adding more prompt content would likely worsen the overload." },
+  { d:5, objective:"Isolate parallel execution", artifact:{name:"orchestrator.yml",code:`runs:
+  - agent: security-fix
+    issue: auth-timeout
+  - agent: dependency-fix
+    issue: bump-actions
+workspace: /tmp/shared-checkout
 branch: main
-file_ownership_check: false`}, q:"Two agents work on independent issues but both modify the same workflow file in a shared checkout. Conflicts appear late and waste both runs. What should change?", a:["Give both agents the same branch so they see changes sooner","Use isolated branches/workspaces and detect overlapping file ownership before execution","Let the faster agent overwrite the slower one","Disable all parallel work"], c:1, why:"Parallel agents need isolated execution plus early conflict detection. This preserves concurrency while making overlapping ownership explicit." },
-  { d:5, objective:"Document handoffs", q:"A planning agent hands work to an implementation agent, which repeatedly revisits already-rejected designs. What artifact should the handoff include?", a:["Only the final task title","Structured decisions, constraints, rejected alternatives, acceptance criteria, and current state","The planner's entire unfiltered conversation","A request to start from scratch"], c:1, why:"A concise, durable handoff prevents duplicated reasoning and contradictory outputs while avoiding the noise and stale material of a full transcript." },
-  { d:5, objective:"Recover degraded workflows", q:"In a three-agent pipeline, the reviewer stalls while the implementer continues opening new changes. What is the safest recovery pattern?", a:["Allow unlimited pending reviews","Pause dependent work, preserve artifacts, retry or replace the reviewer, then escalate if the threshold is exceeded","Delete all branches and restart immediately","Ask the implementer to approve its own work"], c:1, why:"Recovery should contain downstream impact, preserve evidence, attempt bounded recovery, and retain a human escalation path." },
-  { d:6, objective:"Right-size human intervention", artifact:{name:"guardrails.yml",code:`actions:
-  format_code: auto
-  rotate_prod_secret: auto
-  delete_cloud_resource: auto
-audit_log: true`}, q:"A maintenance agent can format code, rotate production secrets, and delete cloud resources. Which autonomy policy is best?", a:["Require approval for every action","Allow all actions because logs exist","Auto-approve reversible formatting; require explicit authorization for secrets and destructive infrastructure actions","Block the agent from formatting code"], c:2, why:"Autonomy should be proportional to risk. Low-risk reversible work can stay fast, while security-sensitive or irreversible actions require explicit control." },
-  { d:6, objective:"Enforce controlled execution paths", q:"An agent identifies a critical production fix at 2 a.m. Company policy requires two-person approval for production changes. What should happen?", a:["The agent bypasses policy because severity is critical","The agent prepares the patch and evidence, then waits in the controlled approval path","The agent uses a personal token to deploy","The agent edits the audit log to mark approval"], c:1, why:"Urgency does not remove compliance requirements. The agent can accelerate preparation and evidence while the protected production path enforces authorization." },
-  { d:6, objective:"Preserve accountability", q:"A team uses one shared service identity for five agents, making it impossible to attribute destructive actions. Which change best restores accountability?", a:["Give every agent the shared password","Use distinct workload identities and immutable action logs","Store the shared token in a more secure vault","Ask agents to include their names in commit messages"], c:1, why:"Distinct identities provide reliable attribution; immutable logs preserve the record. A protected shared credential is still unable to distinguish actors." }
+preflight_file_lock: false
+merge_strategy: last_writer_wins`}, q:"Two agents work on independent issues in the same checkout. Both edit `.github/workflows/deploy.yml`, and the later run overwrites the earlier security fix. What should change?", a:["Keep the shared checkout but ask both agents to commit more frequently","Use isolated workspaces/branches, run an overlap check for owned files before execution, and require an explicit merge decision for conflicts","Let the dependency agent always win because dependency bumps are routine","Disable all parallel agents until the workflow file is never edited"], c:1, why:"Parallelism is not the problem by itself; unmanaged shared state is. Isolation plus early overlap detection preserves speed while making conflicts explicit." },
+  { d:5, objective:"Document handoffs", artifact:{name:"handoff.md",code:`Task: implement selected auth design
+Chosen design: token exchange at edge
+Rejected:
+- browser-stored long-lived token: rejected for leakage risk
+- backend polling: rejected for latency
+Missing:
+- acceptance criteria
+- open risks
+- current files changed`}, q:"A planner hands work to an implementation agent. The implementer keeps reopening rejected designs and misses a latency requirement. What should the handoff include?", a:["Only the final task title so the implementer can reason independently","Decisions, constraints, rejected alternatives with reasons, acceptance criteria, open risks, and current state","The full raw planning transcript, including every dead end","A request for the implementer to restart discovery from zero"], c:1, why:"A useful handoff preserves the decisions that matter without flooding the next agent. Acceptance criteria and rejected alternatives prevent repeated debate and missed constraints." },
+  { d:5, objective:"Recover degraded workflows", artifact:{name:"pipeline_state.json",code:`{
+  "planner": "done",
+  "implementer": "opening PR 4",
+  "reviewer": "stalled: 47m",
+  "pending_reviews": 3,
+  "policy": "max_pending_reviews=1"
+}`}, q:"In a three-agent pipeline, the reviewer has stalled while the implementer keeps opening new pull requests. What is the safest recovery pattern?", a:["Let the implementer continue because review can catch up later","Pause dependent implementation, preserve artifacts, retry or replace the reviewer within a bounded limit, then escalate if still stalled","Delete all branches and restart the entire pipeline immediately","Allow the implementer to approve its own pull requests until the reviewer recovers"], c:1, why:"The system must stop accumulating unreviewed work, preserve evidence, and use bounded recovery before escalation. Self-approval breaks the control the reviewer exists to provide." },
+  { d:6, objective:"Right-size human intervention", artifact:{name:"autonomy_matrix.yml",code:`actions:
+  format_code:
+    reversibility: high
+    approval: required
+  rotate_prod_secret:
+    reversibility: medium
+    approval: auto
+  delete_cloud_resource:
+    reversibility: low
+    approval: auto
+audit_log: enabled`}, q:"The current autonomy matrix slows harmless formatting but auto-approves production secret rotation and destructive cloud deletes. Which policy is best?", a:["Require approval for every action so the agent can never act alone","Auto-approve reversible formatting; require explicit authorization for production secrets and destructive infrastructure actions","Keep auto-approval because audit logs can explain mistakes later","Block formatting and secret rotation, but allow cloud deletes during incidents"], c:1, why:"Autonomy should track risk and reversibility. Logs support accountability but do not replace approval for sensitive or destructive actions." },
+  { d:6, objective:"Enforce controlled execution paths", artifact:{name:"incident_runbook.md",code:`severity: critical
+agent_capability: prepare_patch_and_tests
+production_change_policy:
+  required_approvers: 2
+  bypass_allowed: false
+  evidence_required: diff, tests, rollback_plan`}, q:"At 2 a.m., an agent finds a critical production fix. The runbook forbids bypassing two-person approval but allows the agent to prepare evidence. What should happen?", a:["The agent deploys immediately because critical severity overrides normal controls","The agent prepares the patch, tests, and rollback evidence, then waits in the protected approval path","The agent uses a personal maintainer token so the outage is resolved faster","The agent records approval after deployment once humans wake up"], c:1, why:"Criticality can justify urgency, not bypass. The agent should compress preparation time while the controlled path enforces production authorization." },
+  { d:6, objective:"Preserve accountability", artifact:{name:"identity_audit.log",code:`actor=agent-shared action=delete_resource target=prod-cache
+actor=agent-shared action=rotate_secret target=billing
+actor=agent-shared action=merge_pr target=auth
+note=5 agents use the same workload identity`}, q:"Five agents share one service identity, so destructive actions cannot be attributed to a specific workload. Which change best restores accountability?", a:["Keep the shared identity but require each agent to write its name in commit messages","Use distinct workload identities with scoped permissions and immutable action logs","Store the shared credential in a stronger vault","Add more detailed natural-language final summaries after each run"], c:1, why:"Accountability needs reliable identity at the action boundary plus tamper-resistant logs. A better vault protects the secret, but it does not distinguish which agent acted." }
 ];
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -566,10 +659,15 @@ function updatePlanFields() {
   action.firstChild.textContent = plan === "pro" ? "Continue to Pro checkout " : "Continue to founding access ";
 }
 function closeAccess() { accessDialog.close(); }
-$$('[data-open-access]').forEach(button => button.addEventListener("click", () => {
+$$('[data-open-access]').forEach(button => button.addEventListener("click", event => {
   const plan = button.dataset.plan || "founder";
-  trackEvent("pricing_clicked", { plan, source: button.closest("#pricing") ? "pricing" : "hero" });
-  if (plan === "founder") trackEvent("founding_access_clicked", { source: button.closest("#pricing") ? "pricing" : "hero" });
+  const source = button.closest("#pricing") ? "pricing" : "hero";
+  if (window.handleCheckout?.(plan, source)) {
+    event.preventDefault();
+    return;
+  }
+  trackEvent("pricing_clicked", { plan, source });
+  if (plan === "founder") trackEvent("founding_access_clicked", { source });
   openAccess(plan);
 }));
 $$('[data-close-access]').forEach(button => button.addEventListener("click", closeAccess));

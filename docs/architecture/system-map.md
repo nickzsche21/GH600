@@ -8,7 +8,7 @@
 | Client config | `access-config.js`, `backend-config.js`, `checkout-config.js` | Loaded as plain `<script>` tags before `app.js` — see load order note below |
 | API | `api/*.js`, `api/_lib/*.js` | Vercel Edge Functions (plain `export async function POST(request)`, no framework) |
 | Database | `supabase/schema.sql` | Supabase Postgres (11 tables, RLS enabled), accessed only via service-role key from `api/_lib/supabase.js` |
-| Payments | Paddle (Founding $29, Pro $49, hosted checkout) + Wise (Team $149, Cram $99, manual) | Provider resolved per plan in `api/_lib/plans.js`; Paddle confirmed via `api/webhooks/paddle.js`, Wise via `api/admin/grant.js` (bearer token) |
+| Payments | Gumroad (Founding $29, Pro $49, hosted checkout) + direct email/manual payment (Team $149, Cram $99) | Public Team/Cram CTAs open prefilled email to the founder; manual payment is fulfilled via `api/admin/[action].js` (bearer token) |
 | Entitlement/session | `api/_lib/entitlements.js`, `api/access/session.js`, `api/access/verify.js` | Server-issued, revocable, HMAC-enveloped session tokens (hash-only stored, never raw value persisted); gate revalidated on every Pro-lab entry |
 | Paid content tier structure | `api/_lib/plans.js` (`contentTiers`, `allowedMocks`) | Three tiers: Free (12 diagnostic inline) / Founder $29 (120 questions, MOCK_1–3) / Pro $49 (300 questions, MOCK_1–6 + drills) |
 | Paid content delivery | `api/scenarios/next.js`, `api/scenarios/answer.js`, `api/_lib/scenario-map.js` | 300-scenario premium bank in `gh600_scenarios_v2`; one scenario per call (no answer key), graded server-side, tier-gated per plan |
@@ -35,13 +35,10 @@ only — production (Vercel + Supabase configured) always has
    ownership).
 2. User enters email at the report gate → `captureLead()` POSTs to
    `/api/lead` (`api/lead.js`) → inserts into `leads`.
-3. User clicks a paid plan → `checkout_started` fires, then the access
-   dialog POSTs to `/api/checkout-intent` (`api/checkout-intent.js`), which
-   resolves the plan and its provider server-side via `api/_lib/plans.js`
-   (client-sent `amount` is ignored), inserts a `payment_intents` row, and
-   returns a Paddle hosted-checkout `redirect_url` (Founding Access $29 /
-   Pro $49) or `manual_followup: true` (Team $149 / Cram $99, routed through
-   Wise).
+3. User clicks Founding or Pro → the hosted Gumroad checkout opens. Team and
+   Cram CTAs instead open a prefilled email to `nikhil211884@gmail.com`,
+   because those offers are manually scoped and delivered. Server-owned plan
+   records remain available for founder-side fulfilment.
 4a. **Paddle path (Founding/Pro):** buyer pays on Paddle's hosted page.
    Paddle calls `POST /api/webhooks/paddle` (`api/webhooks/paddle.js`),
    which verifies the `Paddle-Signature` HMAC over the raw body before

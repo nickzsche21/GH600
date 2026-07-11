@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { POST as checkout } from "../api/checkout-intent.js";
-import { verify as verifyAccess } from "../api/access/[action].js";
+import { foundingCount, verify as verifyAccess } from "../api/access/[action].js";
 import { POST as createLead } from "../api/lead.js";
 import { POST as diagnosticComplete } from "../api/diagnostic/complete.js";
 import { grant as adminGrant } from "../api/admin/[action].js";
@@ -54,6 +54,28 @@ test("team plan checkout has no card redirect and is flagged for manual follow-u
     assert.equal(body.provider, "wise");
     assert.equal(body.manual_followup, true);
     assert.equal(body.redirect_url, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("public founding count returns distinct active founding emails without exposing them", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    const params = new URL(url).searchParams;
+    assert.equal(params.get("plan"), "eq.founding_access");
+    assert.equal(params.get("active"), "eq.true");
+    return Response.json([
+      { email: "first@example.com" },
+      { email: "FIRST@example.com" },
+      { email: "second@example.com" }
+    ]);
+  };
+  try {
+    const response = await foundingCount();
+    const body = await response.json();
+    assert.deepEqual(body, { ok: true, claimed: 2, limit: 100, source: "active_entitlements" });
+    assert.doesNotMatch(JSON.stringify(body), /@example\.com/);
   } finally {
     globalThis.fetch = originalFetch;
   }

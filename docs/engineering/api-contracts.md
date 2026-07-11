@@ -97,6 +97,14 @@ HMAC envelope (rejects a forged token with zero DB cost), then looks up
 the hash in `access_sessions` (must be unrevoked and unexpired). Returns
 `{ ok: true, plan, email }` or 401 `{ ok: false, error }`.
 
+## `POST /api/access/founding-count` — `api/access/[action].js`
+
+Returns `{ ok: true, claimed, limit: 100, source: "active_entitlements" }`
+for the public founding counter. `claimed` is the number of distinct emails
+with an active `founding_access` entitlement; emails never leave the server.
+If storage is unavailable, the frontend hides the number rather than showing
+an estimate.
+
 ## `POST /api/admin/grant` — `api/admin/grant.js`
 
 Manual/Wise fulfilment path. Requires `Authorization: Bearer
